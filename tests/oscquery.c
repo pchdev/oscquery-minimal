@@ -36,7 +36,7 @@ tree_callback(wqtree_t* tree, const char* uri, wqvalue_t* v, void* udt)
 wpn_declstatic_mp(wqnmp, 512);
 
 int
-oscquery_test_01(void)
+wquery_unittest_01(void)
 {
     int err;
     wqtree_t* tree;
@@ -71,7 +71,7 @@ oscquery_test_01(void)
     wqserver_palloc(&qserver, &wqnmp);
     wqserver_zro(qserver);
     wqserver_expose(qserver, tree);
-    wqserver_run(qserver, 4731);
+    wqserver_run(qserver, 4731, 4389);
 
     while (s_sig == 0)
         sleep(1);

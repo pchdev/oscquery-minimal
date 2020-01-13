@@ -5,9 +5,6 @@
 #include <wpn114/network/osc.h>
 #include <wpn114/mempool.h>
 
-// + dependencies: mgwebsocket
-// + dependencies: mgjson
-
 typedef struct wq0conf wq0conf_t;
 
 extern const char*
@@ -43,8 +40,6 @@ enum wqflags_t {
 };
 
 union wqvariant_t {
-    wpnstr_t* s;
-    byte_t* o;
     float f;
     char c;
     bool b;
@@ -59,14 +54,6 @@ typedef struct {
 // ------------------------------------------------------------------------------------------------
 
 typedef struct wqnode wqnode_t;
-
-extern int
-wqnode_malloc(wqnode_t** dst)
-__nonnull((1));
-
-extern int
-wqnode_palloc(wqnode_t** dst, struct wmemp_t* mp)
-__nonnull((1, 2));
 
 extern int
 wqnode_setflags(wqnode_t* node, enum wqflags_t flg)
@@ -138,12 +125,20 @@ extern void
 wqserver_zro(wqserver_t* server)
 __nonnull((1));
 
-extern void
+extern int
 wqserver_expose(wqserver_t* server, wqtree_t* tree)
 __nonnull((1, 2));
 
 extern int
-wqserver_run(wqserver_t* server, uint16_t port)
+wqserver_run(wqserver_t* server, uint16_t udpport, uint16_t tcpport)
+__nonnull((1));
+
+extern int
+wqserver_iterate(wqserver_t* server, int ms)
+__nonnull((1));
+
+extern int
+wqserver_stop(wqserver_t* server)
 __nonnull((1));
 
 // ------------------------------------------------------------------------------------------------
@@ -158,8 +153,16 @@ extern int
 wqclient_palloc(wqclient_t** dst, struct wmemp_t* mp)
 __nonnull((1, 2));
 
+extern void
+wqclient_zro(wqclient_t* client)
+__nonnull((1));
+
 extern int
 wqclient_connect(wqclient_t* client, const char* addr, uint16_t port)
+__nonnull((1));
+
+extern int
+wqclient_iterate(wqclient_t* client, int ms)
 __nonnull((1));
 
 extern int

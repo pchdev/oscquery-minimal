@@ -17,19 +17,32 @@ enum womsg_err {
     WOMSG_READ_ONLY,
     WOMSG_TAG_MISMATCH,
     WOMSG_TAG_END,
-    WOMSG_BUFFER_OVERFLOW
+    WOMSG_BUFFER_OVERFLOW,
+    WOMSG_URI_INVALID
 };
 
-#define WOMSG_WTAGLOCKED    0u
-#define WOMSG_WTAGFREE      1u
-#define WOMSG_W             2u
-#define WOMSG_R             3u
-#define WOMSG_INVALID       4u
+#define WOMSG_INVALID       0u
+#define WOMSG_W             1u
+#define WOMSG_WTAGLOCKED    2u
+#define WOMSG_WTAGFREE      3u
+#define WOMSG_R             4u
 
 #define _tag(_womsg)        ((char*)(&(_womsg->buf[_womsg->tag])))
 #define _tagnc(_womsg)      (_tag(_womsg)+1)
 #define _nexttag(_womsg)    (_womsg->buf[_womsg->tag+_womsg->idx])
 #define _taglen(_womsg)     ((byte_t) strlen((char*)&_womsg->buf[_womsg->tag]))
+
+int
+wosc_checkuri(const char* uri)
+{
+    char c;
+    if (*uri != '/')
+        return WOMSG_URI_INVALID;
+    // pattern match the rest,
+    // basically, check invalid characters
+
+    return 0;
+}
 
 int
 womsg_decode(struct womsg* dst, byte_t* src, uint32_t len)
@@ -52,14 +65,31 @@ womsg_setbuf(struct womsg* msg, byte_t* buf, uint32_t len)
     return 0;
 }
 
+static __always_inline int
+womsg_npads(int sz)
+{
+    return 4-(sz%4);
+}
+
 int
 womsg_seturi(struct womsg* msg, const char* uri)
 {
-    // check for missing '/'
+    // check uri
+    int err, len;
+    if ((err = wosc_checkuri(uri)))
+        return err;
     // check size
+    len = strlen(uri);
+    len += womsg_npads(len);
+    // we count the comma + the pads
+    if (msg->usd+len+4 > msg->ble)
+        return WOMSG_BUFFER_OVERFLOW;
+
     strcpy((char*)msg->buf, uri);
     // set tag index
-    return 0;
+    msg->tag = len;
+    msg->usd = len;
+    return err;
 }
 
 int

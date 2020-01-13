@@ -1,7 +1,7 @@
 #include <wpn114/network/osc.h>
 
 void
-test_01(void)
+wosc_unittest_01(void)
 {
     int err;
     byte_t buf[512];
