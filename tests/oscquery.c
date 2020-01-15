@@ -1,4 +1,5 @@
 #include <wpn114/network/oscquery.h>
+#include <wpn114/utilities.h>
 #include <signal.h>
 #include <unistd.h>
 

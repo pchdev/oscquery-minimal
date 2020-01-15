@@ -1,4 +1,8 @@
 #include <wpn114/network/oscquery.h>
+#include <wpn114/utilities.h>
+
+#define WQNODE_IGNORE 0
+#define WQNODE_LISTEN 1
 
 // we want to limit this to 64 bytes
 struct wqnode {
@@ -6,6 +10,7 @@ struct wqnode {
     const char* uri;
     wqvalue_t value;
     enum wqflags_t flags;
+    int status;
 };
 
 struct wqtree {
@@ -16,6 +21,21 @@ struct wqtree {
     void* ptr;
     int flags;    
 };
+
+static int
+wqnode_malloc(wqnode_t** dst)
+{
+    if ((*dst = malloc(sizeof(struct wqnode))) == NULL)
+        return 1;
+    else return 0;
+}
+
+static int
+wqnode_palloc(wqnode_t** dst, struct wmemp_t* mp)
+{
+    return wmemp_req(mp, sizeof(struct wqnode),
+                     (void**)dst);
+}
 
 static int
 wqnode_seturi(wqtree_t* tree, wqnode_t* nd, const char* uri)
@@ -112,7 +132,8 @@ wqtree_getnd(wqtree_t* tree, const char* uri)
     if (!wosc_checkuri(uri)) {
         return NULL;
     }
-
+    if (strlen(uri) == 1)
+        return &tree->root;
     return 0;
 }
 
@@ -134,19 +155,24 @@ wqtree_update(wqtree_t* tree, womsg_t* womsg)
     return wqnode_update(target, womsg);
 }
 
+// ------------------------------------------------------------------------------------------------
+
 #include <dependencies/mongoose/mongoose.h>
 #include <dependencies/mjson/mjson.h>
 
 #ifndef WPN114_MAXCN
-#define WPN114_MAXCN    1
+    #define WPN114_MAXCN    1
 #endif
 
 #ifndef WPN114_MAXPATH
-#define WPN114_MAXPATH  256
+    #define WPN114_MAXPATH  256
+#endif
+
+#ifndef WPN114_MAXJSON
+    #define WPN114_MAXJSON  1024
 #endif
 
 struct wqconnection {
-    const char* addr;
     struct mg_connection* tcp;
     int udp;
 };
@@ -159,6 +185,7 @@ struct wqserver {
     pthread_t thread;
 #endif
     bool running;
+    uint16_t uport;
 };
 
 int
@@ -173,7 +200,8 @@ wqserver_malloc(wqserver_t** dst)
 int
 wqserver_palloc(wqserver_t** dst, struct wmemp_t* mp)
 {
-    return wmemp_req(mp, sizeof(struct wqserver), (void**)dst);
+    return wmemp_req(mp, sizeof(struct wqserver),
+                     (void**)dst);
 }
 
 void
@@ -186,7 +214,8 @@ wqserver_zro(wqserver_t* server)
 int
 wqserver_expose(wqserver_t* server, wqtree_t* tree)
 {
-    return 1;
+    server->tree = tree;
+    return 0;
 }
 
 static void*
@@ -207,6 +236,36 @@ wqserver_getcn(wqserver_t* server, struct mg_connection* mgc)
          if (server->cn[n].tcp == mgc)
              return &server->cn[n];
     return NULL;
+}
+
+static const char* s_host_ext =
+        "{ "
+        "\"ACCESS\": true,"
+        "\"VALUE\": true,"
+        "\"DESCRIPTION\": false,"
+        "\"TAGS\": false,"
+        "\"EXTENDED_TYPE\": false,"
+        "\"UNIT\": false,"
+        "\"CRITICAL\": true,"
+        "\"CLIPMODE\": false,"
+        "\"LISTEN\": true,"
+        "\"PATH_CHANGED\": false,"
+        "\"PATH_REMOVED\": false,"
+        "\"PATH_ADDED\": false,"
+        "\"PATH_RENAMED\": false,"
+        "\"OSC_STREAMING\": true,"
+        "\"HTML\": false,"
+        "\"ECHO\": false "
+        "}"
+        ;
+
+static inline int
+wqserver_reply_json(struct mg_connection* mgc,
+                    const char* json)
+{
+    mg_send_head(mgc, 200, strlen(json), "Content-Type: application/json");
+    mg_printf(mgc, "%.*s", (int)strlen(json), json);
+    return 0;
 }
 
 static void
@@ -233,7 +292,6 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
             // parse json
             // get command str
             char cmd[32];
-            int n;
             mjson_get_string((char*)wm->data, wm->size, "$.COMMAND", cmd, sizeof(cmd));
 
             if (strcmp(cmd, "LISTEN") == 0) {
@@ -243,7 +301,6 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
                 if ((target = wqtree_getnd(server->tree, path))) {
                      // TODO: set listening
                 }
-
             } else if (strcmp(cmd, "IGNORE") == 0) {
                 char path[WPN114_MAXPATH];
                 wqnode_t* target;
@@ -251,7 +308,6 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
                 if ((target = wqtree_getnd(server->tree, path))) {
                     // TODO: set ignoring
                 }
-
             } else if (strcmp(cmd, "START_OSC_STREAMING") == 0) {
                 struct wqconnection* wqc;
                 double port;
@@ -259,11 +315,9 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
                 if ((wqc = wqserver_getcn(server, mgc)))
                     wqc->udp = port;
             }
-
         } else if (wm->flags & WEBSOCKET_OP_BINARY) {
             // parse OSC
             womsg_t* womsg;
-            wqnode_t* target;
             womsg_alloca(&womsg);
             womsg_decode(womsg, wm->data, wm->size);
             wqtree_update(server->tree, womsg);
@@ -274,26 +328,42 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
     case MG_EV_HTTP_REQUEST: {
         struct http_message* hm = data;
         if (strcmp(hm->query_string.p, "HOST_INFO") == 0) {
-            // TODO: HOST_INFO
-            return;
+            // we should use a static memory pool here
+            char buf[WPN114_MAXJSON];
+            int err;
+            err = mjson_printf(&mjson_print_fixed_buf, buf,
+                               "{%Q:%s, %Q:%d, %Q:%s, %Q:%s}",
+                  "NAME", "wqserver",
+                  "OSC_PORT", server->uport,
+                  "OSC_TRANSPORT", "UDP",
+                  "EXTENSIONS", s_host_ext);
+            wqserver_reply_json(mgc, buf);
+            break;
         }
         wqnode_t* target;
         if ((target = wqtree_getnd(server->tree, hm->uri.p))) {
             if (hm->query_string.len) {
-                // emit json
-                char buf[512];
-                struct mjson_fixedbuf mjbuf = { buf, sizeof(buf), 0};
+                // query attribute
+                // we don't expect it to be too large, maybe 128 bytes would be enough
+                char buf[128];
                 // ... TODO
+//                wqserver_reply_json(mgc, buf);
             } else {
-                // query all
+                // query all, including subnodes
+                char buf[WPN114_MAXJSON];
+                // ... TODO
+//                wqserver_reply_json(mgc, buf);
             }
         }
         break;
     }
     case MG_EV_CLOSE: {
-        break;
+        struct wqconnection* wqc;
+        if ((wqc = wqserver_getcn(server, mgc)))
+            memset(wqc, 0, sizeof(struct wqconnection));
+        else
+            wpnerr("couldn't find wqconnection...\n");
     }
-
     }
 }
 
@@ -301,6 +371,7 @@ static void
 wqserver_udp_hdl(struct mg_connection* mgc, int event, void* data)
 {
     wqserver_t* server = mgc->mgr->user_data;
+    (void) data;
     switch (event) {
     case MG_EV_RECV: {
         womsg_t* womsg;
@@ -317,14 +388,16 @@ wqserver_run(wqserver_t* server, uint16_t udpport, uint16_t wsport)
     char s_tcp[5], s_udp[5];
     char udp_hdr[32] = "udp://";
     struct mg_connection* c_tcp, *c_udp;
+    server->uport = udpport;
     sprintf(s_tcp, "%d", wsport);
     sprintf(s_udp, "%d", udpport);
     strcat(udp_hdr, s_udp);
-
-    if ((c_tcp = mg_bind(&server->mgr, s_tcp, wqserver_tcp_hdl)) == NULL) {
+    if ((c_tcp = mg_bind(&server->mgr, s_tcp,
+                 wqserver_tcp_hdl)) == NULL) {
         return 1;
     }
-    if ((c_udp = mg_bind(&server->mgr, udp_hdr, wqserver_udp_hdl)) == NULL) {
+    if ((c_udp = mg_bind(&server->mgr, udp_hdr,
+                 wqserver_udp_hdl)) == NULL) {
         return 2;
     }
     server->running = true;
@@ -349,6 +422,8 @@ wqserver_stop(wqserver_t* server)
 #endif
     return 0;
 }
+
+// ------------------------------------------------------------------------------------------------
 
 struct wqclient {
     struct mg_mgr mgr;
