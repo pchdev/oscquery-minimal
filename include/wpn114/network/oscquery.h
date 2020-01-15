@@ -12,7 +12,8 @@ wquery_strerr(int err);
 
 enum wquery_err {
     WQUERY_NOERROR,
-    WQUERY_PORT_INUSE,
+    WQUERY_BINDERR_UDP,
+    WQUERY_BINDERR_TCP,
     WQUERY_URI_INVALID,
 };
 

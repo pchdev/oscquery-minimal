@@ -40,7 +40,6 @@ wosc_checkuri(const char* uri)
         return WOMSG_URI_INVALID;
     // pattern match the rest,
     // basically, check invalid characters
-
     return 0;
 }
 

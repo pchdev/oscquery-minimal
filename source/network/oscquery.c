@@ -4,6 +4,23 @@
 #define WQNODE_IGNORE 0
 #define WQNODE_LISTEN 1
 
+const char*
+wquery_strerr(int err)
+{
+    switch (err) {
+    case WQUERY_NOERROR:
+        return "no error";
+    case WQUERY_BINDERR_UDP:
+        return "could not bind udp socket (port might already be in use)";
+    case WQUERY_BINDERR_TCP:
+        return "could not bind tcp socket (port might already be in use)";
+    case WQUERY_URI_INVALID:
+        return "invalid uri";
+    default:
+        return "unknown error code";
+    }
+}
+
 // we want to limit this to 64 bytes
 struct wqnode {
     struct wqnode* next;
@@ -149,7 +166,6 @@ wqtree_update(wqtree_t* tree, womsg_t* womsg)
     const char* uri;
     wqnode_t* target;
     uri = womsg_geturi(womsg);
-
     if ((target = wqtree_getnd(tree, uri)) == NULL)
         return WQUERY_URI_INVALID;
     return wqnode_update(target, womsg);
@@ -290,7 +306,6 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
         struct websocket_message* wm = data;
         if (wm->flags & WEBSOCKET_OP_TEXT) {
             // parse json
-            // get command str
             char cmd[32];
             mjson_get_string((char*)wm->data, wm->size, "$.COMMAND", cmd, sizeof(cmd));
 
@@ -299,14 +314,14 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
                 wqnode_t* target;
                 mjson_get_string((char*)wm->data, wm->size, "$.DATA", path, sizeof(path));
                 if ((target = wqtree_getnd(server->tree, path))) {
-                     // TODO: set listening
+                    target->status = WQNODE_LISTEN;
                 }
             } else if (strcmp(cmd, "IGNORE") == 0) {
                 char path[WPN114_MAXPATH];
                 wqnode_t* target;
                 mjson_get_string((char*)wm->data, wm->size, "$.DATA", path, sizeof(path));
                 if ((target = wqtree_getnd(server->tree, path))) {
-                    // TODO: set ignoring
+                    target->status = WQNODE_IGNORE;
                 }
             } else if (strcmp(cmd, "START_OSC_STREAMING") == 0) {
                 struct wqconnection* wqc;
@@ -394,11 +409,11 @@ wqserver_run(wqserver_t* server, uint16_t udpport, uint16_t wsport)
     strcat(udp_hdr, s_udp);
     if ((c_tcp = mg_bind(&server->mgr, s_tcp,
                  wqserver_tcp_hdl)) == NULL) {
-        return 1;
+        return WQUERY_BINDERR_TCP;
     }
     if ((c_udp = mg_bind(&server->mgr, udp_hdr,
                  wqserver_udp_hdl)) == NULL) {
-        return 2;
+        return WQUERY_BINDERR_UDP;
     }
     server->running = true;
 #ifdef WPN114_MULTITHREAD
@@ -427,8 +442,9 @@ wqserver_stop(wqserver_t* server)
 
 struct wqclient {
     struct mg_mgr mgr;
-    struct mg_connection* cn;
-    pthread_t thread;
+    struct wqconnection cn;
+    struct wqtree tree;
+    pthread_t thread;    
     bool running;
 };
 
@@ -464,9 +480,84 @@ wqclient_pthread_run(void* v)
     return 0;
 }
 
+static void
+wqclient_tcp_hdl(struct mg_connection* mgc, int event, void* data)
+{
+    wqclient_t* cli = mgc->mgr->user_data;
+    switch (event) {
+    case MG_EV_CONNECT: {
+        break;
+    }
+    case MG_EV_POLL: {
+        break;
+    }
+    case MG_EV_WEBSOCKET_HANDSHAKE_DONE: {
+        char cmd[128];
+        int err;
+        err = mjson_printf(&mjson_print_fixed_buf, cmd,
+                           "{%Q:%s, %Q:{%Q:%d, %Q:%d}}",
+                           "COMMAND", "START_OSC_STREAMING",
+                           "DATA",
+                           "LOCAL_SERVER_PORT", 1234,
+                           "LOCAL_SENDER_PORT", 0);
+        mg_send_websocket_frame(mgc, WEBSOCKET_OP_TEXT,
+                                cmd, strlen(cmd));
+        break;
+    }
+    case MG_EV_WEBSOCKET_FRAME: {
+        struct websocket_message* wm = data;
+        if (wm->flags & WEBSOCKET_OP_TEXT) {
+            // there should not be any text reply here..
+        } else if (wm->flags & WEBSOCKET_OP_BINARY) {
+            womsg_t* womsg;
+            womsg_alloca(&womsg);
+            womsg_decode(womsg, (byte_t*)mgc->recv_mbuf.buf, mgc->recv_mbuf.len);
+            wqtree_update(&cli->tree, womsg);
+        }
+        break;
+    }
+    case MG_EV_HTTP_REPLY: {
+        struct http_message* hm = data;
+        if (strcmp(hm->query_string.p, "HOST_INFO") == 0) {
+            double uport;
+            mjson_get_number(hm->body.p, hm->body.len, "$.OSC_PORT", &uport);
+            cli->cn.udp = uport;
+        }
+        break;
+    }
+    case MG_EV_CLOSE: {
+        break;
+    }
+    }
+
+}
+
+static void
+wqclient_udp_hdl(struct mg_connection* mgc, int event, void* data)
+{
+    wqclient_t* cli = mgc->mgr->user_data;
+    switch (event) {
+    case MG_EV_RECV: {
+        womsg_t* womsg;
+        womsg_alloca(&womsg);
+        womsg_decode(womsg, (byte_t*)mgc->recv_mbuf.buf, mgc->recv_mbuf.len);
+        wqtree_update(&cli->tree, womsg);
+        break;
+    }
+    }
+}
+
 int
 wqclient_connect(wqclient_t* client, const char* addr, uint16_t port)
 {
+    char waddr[32];
+    struct mg_connection* mgct, *mgcu;
+    sprintf(waddr, "%s:%d", addr, port);
+    if ((mgcu = mg_bind(&client->mgr, "udp://1234", wqclient_udp_hdl)) == NULL)
+        return WQUERY_BINDERR_UDP;
+    if ((mgct = mg_connect_ws(&client->mgr, wqclient_tcp_hdl, waddr, NULL, NULL)) == NULL)
+        return WQUERY_BINDERR_TCP;
+    client->cn.tcp = mgct;
     client->running = true;
 #ifdef WPN114_MULTITHREAD
     pthread_create(&client->thread, 0, wqclient_pthread_run, client);
