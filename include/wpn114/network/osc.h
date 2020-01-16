@@ -69,16 +69,46 @@ const char*
 womsg_gettag(womsg_t* msg)
 __nonnull((1));
 
+// typetag/ctype        | description
+// ---------------------|------------------------------------------------------------------------------------------------
+// i: [int32_t]         | 32-bit big-endian two's complement integer.
+// t: []                | 64-bit big-endian fixed-point time tag, semantics defined below.
+// f: [float]           | 32-bit big-endian IEEE 754 floating point number.
+// s: [const char*]     | A sequence of non-null ASCII characters followed by a null, followed by
+//                        0-3 additional null characters to make the total number of bits a multiple of 32.
+// b: []                | OSC-blob: An int32 size count, followed by that many 8-bit bytes of arbitrary binary
+//                        data, followed by 0-3 additional zero bytes to make the total number of bits a multiple of 32.
+// c: [char]            | An ASCII character, sent as 32-bits.
+// r: []                | 32-bit RGBA color.
+// m: [char[[4]]        | 4-bytes MIDI message. Bytes from MSB to LSB are: port id, status, data1, data2
+// T: [bool]            | True. No bytes are allocated in the argument data.
+// F: [bool]            | False. No bytes are allocated in the argument data.
+// N: []                | Nil. No bytes are allocated in the argument data.
+// I: []                | Infinitum. No bytes are allocated in the argument data.
+// [                    | Indicates the beginning of an array. The tags followed are for data in the Array until
+//                        a close brace tag is reached.
+// ]                    | Indicates the end on an array.
+
+// we make a small modification, for convenience: b will be boolean, B will be OSC-blob...
 int womsg_writei(womsg_t* msg, int32_t value) __nonnull((1));
 int womsg_writef(womsg_t* msg, float value) __nonnull((1));
 int womsg_writeb(womsg_t* msg, bool value) __nonnull((1));
-int womsg_writec(womsg_t* msg, int8_t value) __nonnull((1));
+int womsg_writec(womsg_t* msg, char value) __nonnull((1));
 int womsg_writes(womsg_t* msg, const char* str) __nonnull((1, 2));
+
+// TODO:
+int womsg_writeh(womsg_t* msg, int64_t value) __nonnull((1));
+int womsg_writet(womsg_t* msg) __nonnull((1));
+int womsg_writed(womsg_t* msg, double value) __nonnull((1));
+int womsg_writer(womsg_t* msg, int32_t value) __nonnull((1));
+int womsg_writen(womsg_t* msg) __nonnull((1));
+int womsg_writem(womsg_t* msg, char midi[]) __nonnull((1, 2));
+int womsg_writeI(womsg_t* msg) __nonnull((1));
 
 int womsg_readi(womsg_t* msg, int32_t* dst) __nonnull((1));
 int womsg_readf(womsg_t* msg, float* dst) __nonnull((1));
 int womsg_readb(womsg_t* msg, bool* dst) __nonnull((1));
-int womsg_readc(womsg_t* msg, int8_t* dst) __nonnull((1));
+int womsg_readc(womsg_t* msg, char* dst) __nonnull((1));
 int womsg_reads(womsg_t* msg, char** dst) __nonnull((1));
 
 #endif

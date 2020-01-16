@@ -16,7 +16,6 @@ wosc_unittest_01(void)
     womsg_alloca(&msg);
     assert((err = womsg_setbuf(msg, buf, 512)) == 0);
     assert((err = womsg_seturi(msg, "/foo/bar")) == 0);
-
     assert((err = womsg_settag(msg, "fiTcs")) == 0);
     uri = womsg_geturi(msg);
     tag = womsg_gettag(msg);
@@ -25,21 +24,13 @@ wosc_unittest_01(void)
     assert(womsg_getcnt(msg) == 5);
 
     err = womsg_writef(msg, 32.4);
-    wpnout("writef err: %d\n", err);
-
     err = womsg_writei(msg, 47);
-    wpnout("writei err: %d\n", err);
-
     err = womsg_writec(msg, 'W');
-    wpnout("writec err: %d\n", err);
-
     err = womsg_writes(msg, "owls are not what they seem");
-    wpnout("writes err: %d\n", err);
 
     // in taglocked mode, we should get an error if we try to write another value
     err = womsg_writei(msg, 456);
-    assert(err == 3); // TAG_END
-
+    assert(err == 1);
     assert(womsg_getlen(msg) == 60);
 
     char t;
@@ -72,6 +63,7 @@ wosc_unittest_01(void)
             err = womsg_readc(msg, &c);
             assert(err == 0);
             wpnout("value (char): %c\n", c);
+            break;
         }
         case 's': {
             char* s;
@@ -92,7 +84,6 @@ wosc_unittest_02(void)
 {
     womsg_t* msg;
     womsg_alloca(&msg);
-
 }
 
 int

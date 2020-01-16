@@ -16,6 +16,7 @@ int _womsg_sizeof(void) { return sizeof(struct womsg); }
 enum womsg_err {
     WOMSG_NOERROR,
     WOMSG_READ_ONLY,
+    WOMSG_WRITE_ONLY,
     WOMSG_TAG_MISMATCH,
     WOMSG_TAG_END,
     WOMSG_BUFFER_OVERFLOW,
@@ -32,12 +33,20 @@ enum womsg_err {
 #define _tagnc(_womsg)      (_tag(_womsg)+1)
 #define _nexttag(_womsg)    (*(_tagnc(_womsg)+_womsg->idx))
 
+
+static __always_inline int
+womsg_npads(int sz)
+{
+    return 4-(sz%4);
+}
+
 int
 wosc_checkuri(const char* uri)
 {
     char c;
     if (*uri != '/')
         return WOMSG_URI_INVALID;
+    // TODO:
     // pattern match the rest,
     // basically, check invalid characters
     return 0;
@@ -46,11 +55,17 @@ wosc_checkuri(const char* uri)
 int
 womsg_decode(struct womsg* dst, byte_t* src, uint32_t len)
 {
-    // set message in read mode and return
+    int ulen, tlen;
     dst->buf = src;
     dst->ble = len;
     dst->usd = len;
     dst->mode = WOMSG_R;
+    ulen = strlen((char*)src);
+    ulen += womsg_npads(ulen);
+    dst->tag = ulen;
+    tlen = strlen((char*)&src[ulen])+1;
+    tlen += womsg_npads(tlen);
+    dst->rwi = &src[ulen+tlen];
     return 0;
 }
 
@@ -64,12 +79,6 @@ womsg_setbuf(struct womsg* msg, byte_t* buf, uint32_t len)
     return 0;
 }
 
-static __always_inline int
-womsg_npads(int sz)
-{
-    return 4-(sz%4);
-}
-
 int
 womsg_seturi(struct womsg* msg, const char* uri)
 {
@@ -77,6 +86,8 @@ womsg_seturi(struct womsg* msg, const char* uri)
     int err, len;
     if ((err = wosc_checkuri(uri)))
         return err;
+    if (msg->mode > WOMSG_W)
+        return WOMSG_READ_ONLY;
     // check size
     len = strlen(uri);
     len += womsg_npads(len);
@@ -91,9 +102,16 @@ womsg_seturi(struct womsg* msg, const char* uri)
     return err;
 }
 
+static int
+womsg_checktag(const char* tag)
+{
+    return 0;
+}
+
 int
 womsg_settag(struct womsg* msg, const char* tag)
 {
+    // TODO:
     // check tag first
     // check buffer size
     char* ptr = (char*) &msg->buf[msg->tag];
@@ -166,9 +184,17 @@ womsg_write(struct womsg* msg, void* value, size_t sz)
         msg->usd += sz;
         if (next == 'T' || next == 'F')
             msg->idx++;
-        if (next == 0)
-            // we finished writing, now we can set it in read only mode
-            msg->mode = WOMSG_READ_ONLY;
+        else if (next == 0) {
+            int len;
+            // we are finished writing,
+            // we can now set the message in read-only mode,
+            // resetting tag and r/w indexes.
+            msg->mode = WOMSG_R;
+            msg->idx = 0;
+            len = womsg_getcnt(msg)+1;
+            len += womsg_npads(len);
+            msg->rwi = (byte_t*)(&(msg->buf[msg->tag])+len);
+        }
     }
     return 0;
 }
@@ -194,13 +220,13 @@ womsg_writef(struct womsg* msg, float value)
 }
 
 int
-womsg_writec(struct womsg* msg, int8_t value)
+womsg_writec(struct womsg* msg, char value)
 {
     int err;
-    if (!(err = womsg_checkw(msg, 'c', sizeof(int8_t)))) {
-        womsg_write(msg, &value, sizeof(int8_t));
-        msg->rwi += 3;
-        msg->usd += 3;
+    // we convert to int32
+    int32_t c = value;
+    if (!(err = womsg_checkw(msg, 'c', sizeof(int32_t)))) {
+        womsg_write(msg, &c, sizeof(int32_t));
     }
     return err;
 }
@@ -222,47 +248,90 @@ womsg_writes(struct womsg* msg, const char* str)
     npads = womsg_npads(len);
     if (!(err = womsg_checkw(msg, 's', len))) {
         womsg_write(msg, str, len);
-        msg->rwi += npads;
+        if (msg->mode < WOMSG_R)
+            // if we're still in write mode
+            // after this, add the pads
+            msg->rwi += npads;
         msg->usd += npads;
     }
     return 0;
 }
 
+static int
+womsg_checkr(struct womsg* msg, char tp)
+{
+    if (msg->mode < WOMSG_R)
+        return WOMSG_WRITE_ONLY;
+    if (_nexttag(msg) == 0)
+        return WOMSG_TAG_END;
+    if (tp == 'T') {
+        char n = _nexttag(msg);
+        if (!(n == 'T' || n == 'F'))
+            return WOMSG_TAG_MISMATCH;
+    }
+    else if (_nexttag(msg) != tp)
+        return WOMSG_TAG_MISMATCH;
+    return 0;
+}
+
+static int
+womsg_read(struct womsg* msg, void* dst, size_t tpsz)
+{
+    memcpy(dst, msg->rwi, tpsz);
+    msg->idx++;
+    msg->rwi += tpsz;
+    return 0;
+}
+
 int
 womsg_readi(struct womsg* msg, int32_t* dst)
-{
-    // check read-mode, check type...
-    memcpy(dst, (int*)msg->idx, sizeof(int));
-    msg->idx += sizeof(int);
-    return 1;
+{    
+    int err;
+    if (!(err = womsg_checkr(msg, 'i'))) {
+        womsg_read(msg, dst, sizeof(int32_t));
+    }
+    return err;
 }
 
 int
 womsg_readf(struct womsg* msg, float* dst)
 {
-    return 1;
+    int err;
+    if (!(err = womsg_checkr(msg, 'f'))) {
+        womsg_read(msg, dst, sizeof(float));
+    }
+    return err;
 }
 
 int
 womsg_readb(struct womsg* msg, bool* dst)
 {
-    *dst = _nexttag(msg) == 'T';
-    msg->idx++;
-    return 0;
+    int err;
+    if (!(err = womsg_checkr(msg, 'T'))) {
+        *dst = _nexttag(msg) == 'T';
+        msg->idx++;
+    }
+    return err;
 }
 
 int
-womsg_readc(struct womsg* msg, int8_t* dst)
+womsg_readc(struct womsg* msg, char* dst)
 {
-
+    int err, c;
+    if (!(err = womsg_checkr(msg, 'c'))) {
+        womsg_read(msg, &c, sizeof(int32_t));
+        *dst = (char) c;
+    }
+    return err;
 }
 
 int
 womsg_reads(struct womsg* msg, char** dst)
 {
-    return 1;
+    int err;
+    if (!(err = womsg_checkr(msg, 's'))) {
+        *dst = (char*)msg->rwi;
+        msg->idx++;
+    }
+    return err;
 }
-
-
-
-
