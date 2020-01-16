@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(wpn114 LANGUAGES C)
+project(oscquery-minimal LANGUAGES C)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -11,14 +11,14 @@ set(WPN_TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 set(WPN_DEPENDENCIES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/dependencies)
 set(CMAKE_INCLUDE_CURRENT_DIR TRUE)
 
+option(WPN_TESTS "enables unit-testing for this module" ON)
+
 set(PROJECT_HEADER_FILES
     ${WPN_HEADERS_DIR}/wpn114.h
     ${WPN_HEADERS_DIR}/mempool.h)
 
 set(PROJECT_SOURCE_FILES
-    ${WPN_SOURCES_DIR}/mempool.c
-    ${WPN_TESTS_DIR}/mempool.c
-    )
+    ${WPN_SOURCES_DIR}/mempool.c)
 
 # OPTIONS -----------------------------------------------------------------------------------------
 
@@ -34,16 +34,18 @@ set(PROJECT_HEADER_FILES ${PROJECT_HEADER_FILES}
 set(PROJECT_SOURCE_FILES ${PROJECT_SOURCE_FILES}
     ${WPN_SOURCES_DIR}/network/osc.c
     ${WPN_SOURCES_DIR}/network/oscquery.c
-    ${WPN_TESTS_DIR}/osc.c
-    ${WPN_TESTS_DIR}/oscquery.c
     ${WPN_DEPENDENCIES_DIR}/mongoose/mongoose.c)
+
+if (WPN_TESTS)
+    add_subdirectory(tests)
+endif()
 
 # PROJECT -----------------------------------------------------------------------------------------
 
 include(ProcessorCount)
 ProcessorCount(WPN114_NPROC)
 
-add_executable(${PROJECT_NAME} ${PROJECT_SOURCE_FILES} ${PROJECT_HEADER_FILES})
+add_library(${PROJECT_NAME} ${PROJECT_SOURCE_FILES} ${PROJECT_HEADER_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${WPN_INCLUDE_DIR})
 
 if (WPN_MULTITHREAD)

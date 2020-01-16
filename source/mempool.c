@@ -20,7 +20,7 @@ wmemp_req(struct wmemp_t* mp, size_t nbytes, void** ptr)
 {
     size_t nsz = mp->usd+nbytes;
     if (nsz <= mp->cap) {
-       *ptr = &mp->dat[nsz];
+       *ptr = &mp->dat[mp->usd];
         mp->usd += nbytes;
     }
     return (int)(mp->cap-nsz);
@@ -32,7 +32,7 @@ wmemp_req0(struct wmemp_t* mp, size_t nbytes, void** ptr)
 {
     int ret = wmemp_req(mp, nbytes, ptr);
     if (ret >= 0)
-        memset(ptr, 0, nbytes);
+        memset(*ptr, 0, nbytes);
     return ret;
 }
 

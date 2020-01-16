@@ -21,6 +21,10 @@ wquery_strerr(int err)
     }
 }
 
+// ------------------------------------------------------------------------------------------------
+// NODE/TREE
+// ------------------------------------------------------------------------------------------------
+
 // we want to limit this to 64 bytes
 struct wqnode {
     struct wqnode* next;
@@ -172,9 +176,14 @@ wqtree_update(wqtree_t* tree, womsg_t* womsg)
 }
 
 // ------------------------------------------------------------------------------------------------
+// NETWORK
+// ------------------------------------------------------------------------------------------------
 
 #include <dependencies/mongoose/mongoose.h>
 #include <dependencies/mjson/mjson.h>
+
+#define HTTP_OK             200
+#define HTTP_MIME_JSON      "Content-Type: application/json"
 
 #ifndef WPN114_MAXCN
     #define WPN114_MAXCN    1
@@ -192,6 +201,10 @@ struct wqconnection {
     struct mg_connection* tcp;
     int udp;
 };
+
+// ------------------------------------------------------------------------------------------------
+// SERVER
+// ------------------------------------------------------------------------------------------------
 
 struct wqserver {
     struct mg_mgr mgr;
@@ -279,7 +292,7 @@ static inline int
 wqserver_reply_json(struct mg_connection* mgc,
                     const char* json)
 {
-    mg_send_head(mgc, 200, strlen(json), "Content-Type: application/json");
+    mg_send_head(mgc, HTTP_OK, strlen(json), HTTP_MIME_JSON);
     mg_printf(mgc, "%.*s", (int)strlen(json), json);
     return 0;
 }
@@ -400,8 +413,8 @@ wqserver_udp_hdl(struct mg_connection* mgc, int event, void* data)
 int
 wqserver_run(wqserver_t* server, uint16_t udpport, uint16_t wsport)
 {
-    char s_tcp[5], s_udp[5];
-    char udp_hdr[32] = "udp://";
+    char s_tcp[8], s_udp[8];
+    char udp_hdr[16] = "udp://";
     struct mg_connection* c_tcp, *c_udp;
     server->uport = udpport;
     sprintf(s_tcp, "%d", wsport);
@@ -438,6 +451,8 @@ wqserver_stop(wqserver_t* server)
     return 0;
 }
 
+// ------------------------------------------------------------------------------------------------
+// CLIENT
 // ------------------------------------------------------------------------------------------------
 
 struct wqclient {
