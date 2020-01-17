@@ -349,3 +349,26 @@ womsg_reads(struct womsg* msg, char** dst)
     }
     return err;
 }
+
+int
+womsg_readv(struct womsg* msg, wvalue_t* v)
+{
+    v->t = wosc_tag2tp(*womsg_gettag(msg));
+    switch (v->t) {
+    case WTYPE_STRING: {
+        int err;
+        char* s;
+        if (!(err = womsg_reads(msg, &s))) {
+            if (strlen(s) > v->u.s->cap)
+                return 32;
+            strcpy(v->u.s->dat, s);
+        }
+        return err;
+    }
+    case WTYPE_INT:     return womsg_readi(msg, &v->u.i);
+    case WTYPE_BOOL:    return womsg_readb(msg, &v->u.b);
+    case WTYPE_CHAR:    return womsg_readc(msg, &v->u.c);
+    case WTYPE_FLOAT:   return womsg_readf(msg, &v->u.f);
+    default:            return 1;
+    }
+}

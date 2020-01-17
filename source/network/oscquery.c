@@ -131,7 +131,7 @@ wqnode_settype(wqnode_t* nd, enum wtype_t tp)
 }
 
 static int
-wqnode_set(wqnode_t* nd, wvalue_t* v)
+wqnode_setv(wqnode_t* nd, wvalue_t* v)
 {
     int err;
     if (!(err = wqnode_checktp(nd, v->t))) {
@@ -154,28 +154,28 @@ int
 wqnode_seti(wqnode_t* nd, int i)
 {
     wvalue_t v = { .t = WTYPE_INT, .u.i = i };
-    return wqnode_set(nd, &v);
+    return wqnode_setv(nd, &v);
 }
 
 int
 wqnode_setf(wqnode_t* nd, float f)
 {
     wvalue_t v = { .t = WTYPE_FLOAT, .u.f = f };
-    return wqnode_set(nd, &v);
+    return wqnode_setv(nd, &v);
 }
 
 int
 wqnode_setc(wqnode_t* nd, char c)
 {    
     wvalue_t v = { .t = WTYPE_CHAR, .u.c = c };
-    return wqnode_set(nd, &v);
+    return wqnode_setv(nd, &v);
 }
 
 int
 wqnode_setb(wqnode_t* nd, bool b)
 {
     wvalue_t v = { .t = WTYPE_BOOL, .u.b = b };
-    return wqnode_set(nd, &v);
+    return wqnode_setv(nd, &v);
 }
 
 int
@@ -258,13 +258,23 @@ struct wqtree {
 };
 
 int
+wqtree_malloc(wqtree_t** dst)
+{
+    if ((*dst = malloc(sizeof(struct wqtree)))) {
+        (*dst)->flags |= WQTREE_F_MALLOC;
+        return 0;
+    }
+    return 1;
+}
+
+int
 wqtree_palloc(wqtree_t** dst, struct wmemp_t* mp)
 {
     int nbytes;
     if ((nbytes = wmemp_req0(mp, sizeof(struct wqtree),
                   (void**) dst))) {
         (*dst)->ptr = mp;
-        (*dst)->flags = WQTREE_F_MEMP;
+        (*dst)->flags |= WQTREE_F_MEMP;
     }
     return nbytes;
 }
@@ -278,7 +288,7 @@ _uricatnext(const char* uri, char* str)
         *str++ = *uri++;
 }
 
-static wqnode_t*
+static inline wqnode_t*
 wqnode_getsib(wqnode_t* target, const char* sib)
 {
     while (target->sib && strcmp(target->sib->uri, sib))
@@ -286,7 +296,7 @@ wqnode_getsib(wqnode_t* target, const char* sib)
     return target;
 }
 
-static wqnode_t*
+static inline wqnode_t*
 wqnode_getchd(wqnode_t* target, const char* chd)
 {
     if (strcmp(target->chd->uri, chd))
@@ -370,9 +380,14 @@ wqtree_addnds(wqtree_t* tree, const char* uri,
     if ((err = wqtree_addnd(tree, uri, WTYPE_STRING, dst)))
         return err;
     // todo: distinguish MALLOC from MEMP
-    if ((err = wmemp_req0(tree->ptr, sizeof(wstr_t)+strlim,
-               (void**)&((*dst)->value.u.s))) < 0)
-        return err;
+    if (tree->flags & WQTREE_F_MEMP) {
+        if ((err = wmemp_req0(tree->ptr, sizeof(wstr_t)+strlim,
+                   (void**)&((*dst)->value.u.s))) < 0)
+            return err;
+    } else {
+        // malloc not yet implemented
+        return 1;
+    }
     (*dst)->value.u.s->cap = strlim;
     return 0;
 }
@@ -395,9 +410,16 @@ wqnode_update(wqnode_t* nd, womsg_t* womsg)
     enum wtype_t type;
     type = wosc_tag2tp(*womsg_gettag(womsg));
     if (!(err = wqnode_checktp(nd, type))) {
-        wvalue_t v;
-        womsg_readv(womsg, &v);
-        wqnode_set(nd, &v);
+        if (type == WTYPE_STRING) {
+            // todo: errcheck
+            womsg_readv(womsg, &nd->value);
+            if (nd->fn)
+                nd->fn(nd, &nd->value, nd->udt);
+        } else {
+            wvalue_t v;
+            womsg_readv(womsg, &v);
+            wqnode_setv(nd, &v);
+        }
     }
     return err;
 }
