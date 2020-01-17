@@ -60,12 +60,6 @@ struct wqnode {
     int status;
 };
 
-struct wqtree {
-    struct wqnode root;
-    void* ptr;
-    int flags;    
-};
-
 static int
 wqnode_malloc(wqnode_t** dst)
 {
@@ -103,7 +97,7 @@ wqnode_setfl(wqnode_t* nd, enum wqflags_t fl)
     return 0;
 }
 
-static int
+static inline int
 wqnode_addsib(wqnode_t* nd, wqnode_t* sib)
 {
     while (nd->sib)
@@ -112,7 +106,7 @@ wqnode_addsib(wqnode_t* nd, wqnode_t* sib)
     return 0;
 }
 
-static int
+static inline int
 wqnode_addchd(wqnode_t* nd, wqnode_t* chd)
 {
     if (nd->chd == NULL) {
@@ -257,6 +251,12 @@ wqnode_attr_printj(wqnode_t* nd, const char* attr,
 #define WQTREE_F_MALLOC     1
 #define WQTREE_F_MEMP       2
 
+struct wqtree {
+    struct wqnode root;
+    void* ptr;
+    int flags;
+};
+
 int
 wqtree_palloc(wqtree_t** dst, struct wmemp_t* mp)
 {
@@ -392,13 +392,12 @@ static int
 wqnode_update(wqnode_t* nd, womsg_t* womsg)
 {
     int err;
-    const char* tag;
     enum wtype_t type;
     type = wosc_tag2tp(*womsg_gettag(womsg));
     if (!(err = wqnode_checktp(nd, type))) {
         wvalue_t v;
-        v = womsg_readv(womsg);
-        nd->value = v;
+        womsg_readv(womsg, &v);
+        wqnode_set(nd, &v);
     }
     return err;
 }
@@ -613,13 +612,13 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
                 // query attribute
                 // we don't expect it to be too large, maybe 128 bytes would be enough
                 char buf[128];
-                // ... TODO
-//                wqserver_reply_json(mgc, buf);
+                wqnode_attr_printj(target, hm->query_string.p, buf, 128);
+                wqserver_reply_json(mgc, buf);
             } else {
                 // query all, including subnodes
                 char buf[WPN114_MAXJSON];
-                // ... TODO
-//                wqserver_reply_json(mgc, buf);
+                wqnode_printj(target, buf, WPN114_MAXJSON);
+                wqserver_reply_json(mgc, buf);
             }
         }
         break;

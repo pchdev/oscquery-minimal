@@ -28,14 +28,12 @@ enum wqflags_t {
     WQNODE_FN_SETPOST,
 };
 
-// ------------------------------------------------------------------------------------------------
-
 typedef struct wqnode wqnode_t;
 
 typedef
 void (*wqnode_fn) (
       wqnode_t*,    // target-node
-      wvalue_t*,   // value reference
+      wvalue_t*,    // value reference
       void*         // user-data
 );
 
@@ -58,8 +56,6 @@ extern int wqnode_getf(wqnode_t* node, float* f) __nonnull((1, 2));;
 extern int wqnode_getc(wqnode_t* node, char* c) __nonnull((1, 2));;
 extern int wqnode_getb(wqnode_t* node, bool* b) __nonnull((1, 2));;
 extern int wqnode_gets(wqnode_t* node, const char** s) __nonnull((1, 2));;
-
-// ------------------------------------------------------------------------------------------------
 
 typedef struct wqtree wqtree_t;
 
@@ -87,8 +83,6 @@ extern int wqtree_addnds(wqtree_t* tree, const char* uri, wqnode_t** dst,
 extern wqnode_t*
 wqtree_getnd(wqtree_t* tree, const char* uri)
 __nonnull((1, 2));
-
-// ------------------------------------------------------------------------------------------------
 
 typedef struct wqserver wqserver_t;
 
@@ -119,8 +113,6 @@ __nonnull((1));
 extern int
 wqserver_stop(wqserver_t* server)
 __nonnull((1));
-
-// ------------------------------------------------------------------------------------------------
 
 typedef struct wqclient wqclient_t;
 

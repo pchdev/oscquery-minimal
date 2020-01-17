@@ -115,5 +115,6 @@ int womsg_readf(womsg_t* msg, float* dst) __nonnull((1));
 int womsg_readb(womsg_t* msg, bool* dst) __nonnull((1));
 int womsg_readc(womsg_t* msg, char* dst) __nonnull((1));
 int womsg_reads(womsg_t* msg, char** dst) __nonnull((1));
+int womsg_readv(womsg_t* msg, wvalue_t* dst) __nonnull((1));
 
 #endif

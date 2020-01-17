@@ -288,7 +288,7 @@ womsg_checkr(struct womsg* msg, char tp)
     return 0;
 }
 
-static int
+static inline int
 womsg_read(struct womsg* msg, void* dst, size_t tpsz)
 {
     memcpy(dst, msg->rwi, tpsz);
