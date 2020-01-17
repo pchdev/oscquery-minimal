@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <wpn114/wpn114.h>
+#include <wpn114/types.h>
 #include <alloca.h>
 #include <string.h>
 
@@ -20,6 +20,10 @@ int _wobdl_sizeof(void);
 
 const char*
 wosc_strerr(int err);
+
+enum wtype_t
+wosc_tag2tp(char tag)
+__nonnull((1));
 
 int
 wosc_checkuri(const char* uri)
@@ -97,6 +101,7 @@ int womsg_writec(womsg_t* msg, char value) __nonnull((1));
 int womsg_writes(womsg_t* msg, const char* str) __nonnull((1, 2));
 
 // TODO:
+int womsg_writev(womsg_t* msg, wvalue_t val) __nonnull((1));
 int womsg_writeh(womsg_t* msg, int64_t value) __nonnull((1));
 int womsg_writet(womsg_t* msg) __nonnull((1));
 int womsg_writed(womsg_t* msg, double value) __nonnull((1));

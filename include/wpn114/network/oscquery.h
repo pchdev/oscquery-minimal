@@ -16,19 +16,7 @@ enum wquery_err {
     WQUERY_BINDERR_TCP,
     WQUERY_URI_INVALID,
     WQUERY_TYPE_MISMATCH,
-};
-
-enum wqtype_t {
-    WQTYPE_NIL,
-    WQTYPE_INT,
-    WQTYPE_FLOAT,
-    WQTYPE_CHAR,
-    WQTYPE_BOOL,
-    WQTYPE_STRING,
-    WQTYPE_PULSE,
-    WQTYPE_VEC2F,
-    WQTYPE_VEC3F,
-    WQTYPE_VEC4F
+    WQUERY_STRBUF_OVERFLOW
 };
 
 enum wqflags_t {
@@ -40,25 +28,6 @@ enum wqflags_t {
     WQNODE_FN_SETPOST,
 };
 
-struct wstr_t {
-    uint16_t usd;
-    uint16_t cap;
-    char dat[];
-};
-
-union wqvariant_t {
-    struct wstr_t* s;
-    float f;
-    char c;
-    bool b;
-    int i;
-};
-
-typedef struct {
-    union wqvariant_t u;
-    enum wqtype_t t;
-} wqvalue_t;
-
 // ------------------------------------------------------------------------------------------------
 
 typedef struct wqnode wqnode_t;
@@ -66,7 +35,7 @@ typedef struct wqnode wqnode_t;
 typedef
 void (*wqnode_fn) (
       wqnode_t*,    // target-node
-      wqvalue_t*,   // value reference
+      wvalue_t*,   // value reference
       void*         // user-data
 );
 
@@ -103,7 +72,7 @@ wqtree_palloc(wqtree_t** dst, struct wmemp_t* mp)
 __nonnull((1, 2));
 
 extern int
-wqtree_addnd(wqtree_t* tree, const char* uri, enum wqtype_t wqtype, wqnode_t** dst)
+wqtree_addnd(wqtree_t* tree, const char* uri, enum wtype_t wtp, wqnode_t** dst)
 __nonnull((1, 2, 4));
 
 extern int wqtree_addndi(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));

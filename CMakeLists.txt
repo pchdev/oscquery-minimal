@@ -16,6 +16,7 @@ option(WPN_TESTS "enables unit-testing for this module" ON)
 set(PROJECT_HEADER_FILES
     ${WPN_HEADERS_DIR}/wpn114.h
     ${WPN_HEADERS_DIR}/utilities.h
+    ${WPN_HEADERS_DIR}/types.h
     ${WPN_HEADERS_DIR}/mempool.h)
 
 set(PROJECT_SOURCE_FILES

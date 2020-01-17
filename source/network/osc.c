@@ -13,6 +13,20 @@ struct womsg {
 
 int _womsg_sizeof(void) { return sizeof(struct womsg); }
 
+enum wtype_t
+wosc_tag2tp(char tag)
+{
+    switch (tag) {
+    case 'i': return WTYPE_INT;
+    case 'f': return WTYPE_FLOAT;
+    case 'b': return WTYPE_BOOL;
+    case 'c': return WTYPE_CHAR;
+    case 's': return WTYPE_STRING;
+    case 'N': return WTYPE_NIL;
+    default: return WTYPE_INVALID;
+    }
+}
+
 enum womsg_err {
     WOMSG_NOERROR,
     WOMSG_READ_ONLY,

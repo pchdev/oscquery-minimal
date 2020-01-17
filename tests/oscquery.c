@@ -14,31 +14,31 @@ signal_hdl(int sgno)
 }
 
 void
-ndi_fn(wqnode_t* nd, wqvalue_t* v, void* udt)
+ndi_fn(wqnode_t* nd, wvalue_t* v, void* udt)
 {
     wpnout("/foo/bar/int value: %d\n", v->u.i);
 }
 
 void
-ndf_fn(wqnode_t* nd, wqvalue_t* v, void* udt)
+ndf_fn(wqnode_t* nd, wvalue_t* v, void* udt)
 {
     wpnout("/foo/bar/float value: %f\n", v->u.f);
 }
 
 void
-ndb_fn(wqnode_t* nd, wqvalue_t* v, void* udt)
+ndb_fn(wqnode_t* nd, wvalue_t* v, void* udt)
 {
     wpnout("/foo/bar/bool value: %d\n", v->u.b);
 }
 
 void
-ndc_fn(wqnode_t* nd, wqvalue_t* v, void* udt)
+ndc_fn(wqnode_t* nd, wvalue_t* v, void* udt)
 {
     wpnout("/foo/bar/char value: %c\n", v->u.c);
 }
 
 void
-nds_fn(wqnode_t* nd, wqvalue_t* v, void* udt)
+nds_fn(wqnode_t* nd, wvalue_t* v, void* udt)
 {
 //    wpnout("/foo/bar/float value: %s\n", v->u.s);
 }

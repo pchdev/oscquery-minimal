@@ -11,14 +11,37 @@ wquery_strerr(int err)
     case WQUERY_NOERROR:
         return "no error";
     case WQUERY_BINDERR_UDP:
-        return "could not bind udp socket (port might already be in use)";
+        return "could not bind udp socket "
+               "(port might already be in use)";
     case WQUERY_BINDERR_TCP:
-        return "could not bind tcp socket (port might already be in use)";
+        return "could not bind tcp socket "
+               "(port might already be in use)";
     case WQUERY_URI_INVALID:
         return "invalid uri";
     default:
         return "unknown error code";
     }
+}
+
+int
+wstr_malloc(uint16_t cap, wstr_t** dst)
+{
+    if (((*dst) = malloc(sizeof(wstr_t) + cap))) {
+        memset(*dst, 0, sizeof(wstr_t) + cap);
+        (*dst)->cap = cap;
+    }
+    return 1;
+}
+
+int
+wstr_palloc(struct wmemp_t* mp, uint16_t cap, wstr_t** dst)
+{
+    int err;
+    if ((err = wmemp_req0(mp, sizeof(wstr_t)+cap,
+               (void**) dst)) >= 0) {
+        (*dst)->cap = cap;
+    }
+    return err;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -32,7 +55,7 @@ struct wqnode {
     const char* uri;
     wqnode_fn fn;
     void* udt;
-    wqvalue_t value;
+    wvalue_t value;
     enum wqflags_t flags;
     int status;
 };
@@ -101,19 +124,20 @@ wqnode_addchd(wqnode_t* nd, wqnode_t* chd)
 }
 
 static inline int
-wqnode_checktp(wqnode_t* nd, enum wqtype_t tp)
+wqnode_checktp(wqnode_t* nd, enum wtype_t tp)
 {
-    return nd->value.t == tp ? 0 : WQUERY_TYPE_MISMATCH;
+    return nd->value.t == tp ?
+           0 : WQUERY_TYPE_MISMATCH;
 }
 
 static inline void
-wqnode_settype(wqnode_t* nd, enum wqtype_t tp)
+wqnode_settype(wqnode_t* nd, enum wtype_t tp)
 {
     nd->value.t = tp;
 }
 
 static int
-wqnode_set(wqnode_t* nd, wqvalue_t* v)
+wqnode_set(wqnode_t* nd, wvalue_t* v)
 {
     int err;
     if (!(err = wqnode_checktp(nd, v->t))) {
@@ -135,28 +159,28 @@ wqnode_set(wqnode_t* nd, wqvalue_t* v)
 int
 wqnode_seti(wqnode_t* nd, int i)
 {
-    wqvalue_t v = { .t = WQTYPE_INT, .u.i = i };
+    wvalue_t v = { .t = WTYPE_INT, .u.i = i };
     return wqnode_set(nd, &v);
 }
 
 int
 wqnode_setf(wqnode_t* nd, float f)
 {
-    wqvalue_t v = { .t = WQTYPE_FLOAT, .u.f = f };
+    wvalue_t v = { .t = WTYPE_FLOAT, .u.f = f };
     return wqnode_set(nd, &v);
 }
 
 int
 wqnode_setc(wqnode_t* nd, char c)
 {    
-    wqvalue_t v = { .t = WQTYPE_CHAR, .u.c = c };
+    wvalue_t v = { .t = WTYPE_CHAR, .u.c = c };
     return wqnode_set(nd, &v);
 }
 
 int
 wqnode_setb(wqnode_t* nd, bool b)
 {
-    wqvalue_t v = { .t = WQTYPE_BOOL, .u.b = b };
+    wvalue_t v = { .t = WTYPE_BOOL, .u.b = b };
     return wqnode_set(nd, &v);
 }
 
@@ -164,9 +188,9 @@ int
 wqnode_sets(wqnode_t* nd, const char* s)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WQTYPE_STRING))) {
+    if (!(err = wqnode_checktp(nd, WTYPE_STRING))) {
         if (strlen(s) > nd->value.u.s->cap)
-            return 31; // TODO: add proper error code
+            return WQUERY_STRBUF_OVERFLOW;
         memset(nd->value.u.s->dat, 0, nd->value.u.s->usd);
         strcpy(nd->value.u.s->dat, s);
         // we have to store it somewhere..
@@ -181,7 +205,7 @@ int
 wqnode_geti(wqnode_t* nd, int* i)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WQTYPE_INT))) {
+    if (!(err = wqnode_checktp(nd, WTYPE_INT))) {
         *i = nd->value.u.i;
     }
     return err;
@@ -191,7 +215,7 @@ int
 wqnode_getf(wqnode_t* nd, float* f)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WQTYPE_FLOAT))) {
+    if (!(err = wqnode_checktp(nd, WTYPE_FLOAT))) {
         *f = nd->value.u.f;
     }
     return err;
@@ -201,7 +225,7 @@ int
 wqnode_getc(wqnode_t* nd, char* c)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WQTYPE_CHAR))) {
+    if (!(err = wqnode_checktp(nd, WTYPE_CHAR))) {
         *c = nd->value.u.c;
     }
     return err;
@@ -211,10 +235,23 @@ int
 wqnode_gets(wqnode_t* nd, const char** s)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WQTYPE_STRING))) {
+    if (!(err = wqnode_checktp(nd, WTYPE_STRING))) {
         *s = nd->value.u.s->dat;
     }
     return err;
+}
+
+static int
+wqnode_printj(wqnode_t* nd, char* buf, int len)
+{
+    return 1;
+}
+
+static int
+wqnode_attr_printj(wqnode_t* nd, const char* attr,
+                   char* buf, int len)
+{
+    return 1;
 }
 
 #define WQTREE_F_MALLOC     1
@@ -232,28 +269,58 @@ wqtree_palloc(wqtree_t** dst, struct wmemp_t* mp)
     return nbytes;
 }
 
+static inline void
+_uricatnext(const char* uri, char* str)
+{
+    *str++ = '/';
+    uri++;
+    while (*uri != '/')
+        *str++ = *uri++;
+}
+
+static wqnode_t*
+wqnode_getsib(wqnode_t* target, const char* sib)
+{
+    while (target->sib && strcmp(target->sib->uri, sib))
+           target = target->sib;
+    return target;
+}
+
+static wqnode_t*
+wqnode_getchd(wqnode_t* target, const char* chd)
+{
+    if (strcmp(target->chd->uri, chd))
+        return wqnode_getsib(target->chd, chd);
+    else
+        return target->chd;
+}
+
 static wqnode_t*
 wqtree_getparent(wqtree_t* tree, const char* uri)
 {
-    wqnode_t* target = &tree->root;
+    wqnode_t* target;
+    wqnode_t* child;
+    wstr_t* str;
+    int len, err;
+    target = &tree->root;
+    len = strlen(uri);
     // we're looking for /foo/bar/int parent
     // look for /foo first
     // if /foo exists, set target to /foo and look for /foo/bar
     // if /foo doesn't exist, set it to root
     // we have to allocate a string here, of the same size as uri
-    int len;
-    struct wstr_t* str;
-    char* strdat;
-    len = strlen(uri);
-    wmemp_req0(tree->ptr, sizeof(struct wstr_t)+len, (void**)&str);
-    //..
-
-    return 0;
+    if ((err = wstr_palloc(tree->ptr, len, &str)) < 0)
+        return NULL;
+    while ((child = wqnode_getchd(target, str->dat))) {
+           _uricatnext(uri, str->dat);
+           target = child;
+    }
+    return target;
 }
 
 int
 wqtree_addnd(wqtree_t* tree, const char* uri,
-             enum wqtype_t type, wqnode_t** dst)
+             enum wtype_t type, wqnode_t** dst)
 {
     int err = 0;
     wqnode_t* parent, *nd;
@@ -261,7 +328,9 @@ wqtree_addnd(wqtree_t* tree, const char* uri,
         return WQUERY_URI_INVALID;
     if ((err = wqnode_palloc(&nd, tree->ptr)) < 0)
         return err;
-    parent = wqtree_getparent(tree, uri);
+    if ((parent = wqtree_getparent(tree, uri)) == NULL)
+        return 43; // TODO: add proper error code: not enough memory space
+
     wqnode_settype(nd, type);
     wqnode_seturi(nd, uri);
     wqnode_addchd(parent, nd);
@@ -272,25 +341,25 @@ wqtree_addnd(wqtree_t* tree, const char* uri,
 int
 wqtree_addndi(wqtree_t* tree, const char* uri, wqnode_t** dst)
 {
-    return wqtree_addnd(tree, uri, WQTYPE_INT, dst);
+    return wqtree_addnd(tree, uri, WTYPE_INT, dst);
 }
 
 int
 wqtree_addndf(wqtree_t* tree, const char* uri, wqnode_t** dst)
 {
-    return wqtree_addnd(tree, uri, WQTYPE_FLOAT, dst);
+    return wqtree_addnd(tree, uri, WTYPE_FLOAT, dst);
 }
 
 int
 wqtree_addndb(wqtree_t* tree, const char* uri, wqnode_t** dst)
 {
-    return wqtree_addnd(tree, uri, WQTYPE_BOOL, dst);
+    return wqtree_addnd(tree, uri, WTYPE_BOOL, dst);
 }
 
 int
 wqtree_addndc(wqtree_t* tree, const char* uri, wqnode_t** dst)
 {
-    return wqtree_addnd(tree, uri, WQTYPE_CHAR, dst);
+    return wqtree_addnd(tree, uri, WTYPE_CHAR, dst);
 }
 
 int
@@ -298,10 +367,10 @@ wqtree_addnds(wqtree_t* tree, const char* uri,
               wqnode_t** dst, int strlim)
 {
     int err;
-    if ((err = wqtree_addnd(tree, uri, WQTYPE_STRING, dst)))
+    if ((err = wqtree_addnd(tree, uri, WTYPE_STRING, dst)))
         return err;
     // todo: distinguish MALLOC from MEMP
-    if ((err = wmemp_req0(tree->ptr, sizeof(struct wstr_t)+strlim,
+    if ((err = wmemp_req0(tree->ptr, sizeof(wstr_t)+strlim,
                (void**)&((*dst)->value.u.s))) < 0)
         return err;
     (*dst)->value.u.s->cap = strlim;
@@ -322,7 +391,16 @@ wqtree_getnd(wqtree_t* tree, const char* uri)
 static int
 wqnode_update(wqnode_t* nd, womsg_t* womsg)
 {
-    return 1;
+    int err;
+    const char* tag;
+    enum wtype_t type;
+    type = wosc_tag2tp(*womsg_gettag(womsg));
+    if (!(err = wqnode_checktp(nd, type))) {
+        wvalue_t v;
+        v = womsg_readv(womsg);
+        nd->value = v;
+    }
+    return err;
 }
 
 static int
