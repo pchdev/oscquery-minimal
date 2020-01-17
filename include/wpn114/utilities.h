@@ -16,7 +16,7 @@
     fprintf(stdout, "[wpn114] " _ltl, ##__VA_ARGS__)
 
 #define wpnerr(_ltl, ...)                                                           \
-    fprintf(stderr, "[wpn114] error -- %s(%u): " _ltl,                              \
+    fprintf(stderr, "[wpn114] error\n    %s (line %u):\n    " _ltl,                 \
         __FILE__, __LINE__, ##__VA_ARGS__)
 
 #define wpnwrap(_vlu, _lim)                                                         \

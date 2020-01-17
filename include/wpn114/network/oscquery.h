@@ -15,10 +15,11 @@ enum wquery_err {
     WQUERY_BINDERR_UDP,
     WQUERY_BINDERR_TCP,
     WQUERY_URI_INVALID,
+    WQUERY_TYPE_MISMATCH,
 };
 
 enum wqtype_t {
-    WQTYPE_NONE,
+    WQTYPE_NIL,
     WQTYPE_INT,
     WQTYPE_FLOAT,
     WQTYPE_CHAR,
@@ -35,12 +36,18 @@ enum wqflags_t {
     WQNODE_NOREPEAT,
     WQNODE_READONLY,
     WQNODE_WRITEONLY,
-    WQNODE_CALLBACK_SETPRE,
-    WQNODE_CALLBACK_SETNO,
-    WQNODE_CALLBACK_SETPOST,
+    WQNODE_FN_SETPRE,
+    WQNODE_FN_SETPOST,
+};
+
+struct wstr_t {
+    uint16_t usd;
+    uint16_t cap;
+    char dat[];
 };
 
 union wqvariant_t {
+    struct wstr_t* s;
     float f;
     char c;
     bool b;
@@ -56,9 +63,20 @@ typedef struct {
 
 typedef struct wqnode wqnode_t;
 
+typedef
+void (*wqnode_fn) (
+      wqnode_t*,    // target-node
+      wqvalue_t*,   // value reference
+      void*         // user-data
+);
+
 extern int
-wqnode_setflags(wqnode_t* node, enum wqflags_t flg)
+wqnode_setfl(wqnode_t* node, enum wqflags_t flg)
 __nonnull((1));
+
+extern void
+wqnode_setfn(wqnode_t* node, wqnode_fn fn, void* udata)
+__nonnull((1, 2));
 
 extern int wqnode_seti(wqnode_t* node, int i) __nonnull((1));;
 extern int wqnode_setf(wqnode_t* node, float f) __nonnull((1));;
@@ -76,24 +94,12 @@ extern int wqnode_gets(wqnode_t* node, const char** s) __nonnull((1, 2));;
 
 typedef struct wqtree wqtree_t;
 
-typedef
-void (*wqtree_callback) (
-      wqtree_t*,    // tree
-      const char*,  // target uri
-      wqvalue_t*,    // value
-      void*         // user-data
-);
-
 extern int
 wqtree_malloc(wqtree_t** dst)
 __nonnull((1));
 
 extern int
 wqtree_palloc(wqtree_t** dst, struct wmemp_t* mp)
-__nonnull((1, 2));
-
-extern void
-wqtree_setcallback(wqtree_t* tree, wqtree_callback cb, void* udata)
 __nonnull((1, 2));
 
 extern int
@@ -104,7 +110,10 @@ extern int wqtree_addndi(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonn
 extern int wqtree_addndf(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));
 extern int wqtree_addndb(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));
 extern int wqtree_addndc(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));
-extern int wqtree_addnds(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));
+
+// note: if strlim == 0, and in malloc mode, no limit for str in size
+extern int wqtree_addnds(wqtree_t* tree, const char* uri, wqnode_t** dst,
+                         int strlim) __nonnull((1, 2, 3));
 
 extern wqnode_t*
 wqtree_getnd(wqtree_t* tree, const char* uri)

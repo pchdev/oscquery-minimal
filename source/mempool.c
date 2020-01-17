@@ -64,6 +64,6 @@ wmemp_rmn(struct wmemp_t* mp)
 void
 wmemp_rmnprint(struct wmemp_t* mp)
 {
-    wpnout("wmemp [%p] remaining capacity: %d bytes\n",
-           (void*) mp, wmemp_rmn(mp));
+    wpnout("wmemp [%p] used: %d bytes, remaining capacity: %d bytes\n",
+           (void*) mp, mp->usd, wmemp_rmn(mp));
 }

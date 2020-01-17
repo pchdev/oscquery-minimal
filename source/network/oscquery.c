@@ -27,8 +27,11 @@ wquery_strerr(int err)
 
 // we want to limit this to 64 bytes
 struct wqnode {
-    struct wqnode* next;
+    struct wqnode* sib;
+    struct wqnode* chd;
     const char* uri;
+    wqnode_fn fn;
+    void* udt;
     wqvalue_t value;
     enum wqflags_t flags;
     int status;
@@ -36,9 +39,6 @@ struct wqnode {
 
 struct wqtree {
     struct wqnode root;
-    const char* name;
-    wqtree_callback vcb;
-    void* udt;
     void* ptr;
     int flags;    
 };
@@ -55,19 +55,166 @@ static int
 wqnode_palloc(wqnode_t** dst, struct wmemp_t* mp)
 {
     return wmemp_req(mp, sizeof(struct wqnode),
-                     (void**)dst);
+                    (void**)dst);
 }
 
 static int
-wqnode_seturi(wqtree_t* tree, wqnode_t* nd, const char* uri)
+wqnode_seturi(wqnode_t* nd, const char* uri)
 {
+    nd->uri = uri;
+    return 0;
+}
+
+void
+wqnode_setfn(wqnode_t* nd, wqnode_fn fn, void* udt)
+{
+    nd->fn = fn;
+    nd->udt = udt;
+}
+
+int
+wqnode_setfl(wqnode_t* nd, enum wqflags_t fl)
+{
+    // TODO: check flags first
+    nd->flags = fl;
     return 0;
 }
 
 static int
-wqnode_addnxt(wqnode_t* prnt, wqnode_t* nxt)
+wqnode_addsib(wqnode_t* nd, wqnode_t* sib)
 {
+    while (nd->sib)
+        nd = nd->sib;
+    nd->sib = sib;
+    return 0;
+}
 
+static int
+wqnode_addchd(wqnode_t* nd, wqnode_t* chd)
+{
+    if (nd->chd == NULL) {
+        nd->chd = chd;
+    } else {
+        wqnode_addsib(nd->chd, chd);
+    }
+    return 0;
+}
+
+static inline int
+wqnode_checktp(wqnode_t* nd, enum wqtype_t tp)
+{
+    return nd->value.t == tp ? 0 : WQUERY_TYPE_MISMATCH;
+}
+
+static inline void
+wqnode_settype(wqnode_t* nd, enum wqtype_t tp)
+{
+    nd->value.t = tp;
+}
+
+static int
+wqnode_set(wqnode_t* nd, wqvalue_t* v)
+{
+    int err;
+    if (!(err = wqnode_checktp(nd, v->t))) {
+        if (nd->fn) {
+            if (nd->flags & WQNODE_FN_SETPRE) {
+                nd->fn(nd, v, nd->udt);
+                nd->value = *v;
+            } else {
+                nd->value = *v;
+                nd->fn(nd, v, nd->udt);
+            }
+        } else {
+            nd->value = *v;
+        }
+    }
+    return err;
+}
+
+int
+wqnode_seti(wqnode_t* nd, int i)
+{
+    wqvalue_t v = { .t = WQTYPE_INT, .u.i = i };
+    return wqnode_set(nd, &v);
+}
+
+int
+wqnode_setf(wqnode_t* nd, float f)
+{
+    wqvalue_t v = { .t = WQTYPE_FLOAT, .u.f = f };
+    return wqnode_set(nd, &v);
+}
+
+int
+wqnode_setc(wqnode_t* nd, char c)
+{    
+    wqvalue_t v = { .t = WQTYPE_CHAR, .u.c = c };
+    return wqnode_set(nd, &v);
+}
+
+int
+wqnode_setb(wqnode_t* nd, bool b)
+{
+    wqvalue_t v = { .t = WQTYPE_BOOL, .u.b = b };
+    return wqnode_set(nd, &v);
+}
+
+int
+wqnode_sets(wqnode_t* nd, const char* s)
+{
+    int err;
+    if (!(err = wqnode_checktp(nd, WQTYPE_STRING))) {
+        if (strlen(s) > nd->value.u.s->cap)
+            return 31; // TODO: add proper error code
+        memset(nd->value.u.s->dat, 0, nd->value.u.s->usd);
+        strcpy(nd->value.u.s->dat, s);
+        // we have to store it somewhere..
+        // so we can't really have a SETPRE call
+        if (nd->fn)
+            nd->fn(nd, &nd->value, nd->udt);
+    }
+    return err;
+}
+
+int
+wqnode_geti(wqnode_t* nd, int* i)
+{
+    int err;
+    if (!(err = wqnode_checktp(nd, WQTYPE_INT))) {
+        *i = nd->value.u.i;
+    }
+    return err;
+}
+
+int
+wqnode_getf(wqnode_t* nd, float* f)
+{
+    int err;
+    if (!(err = wqnode_checktp(nd, WQTYPE_FLOAT))) {
+        *f = nd->value.u.f;
+    }
+    return err;
+}
+
+int
+wqnode_getc(wqnode_t* nd, char* c)
+{
+    int err;
+    if (!(err = wqnode_checktp(nd, WQTYPE_CHAR))) {
+        *c = nd->value.u.c;
+    }
+    return err;
+}
+
+int
+wqnode_gets(wqnode_t* nd, const char** s)
+{
+    int err;
+    if (!(err = wqnode_checktp(nd, WQTYPE_STRING))) {
+        *s = nd->value.u.s->dat;
+    }
+    return err;
 }
 
 #define WQTREE_F_MALLOC     1
@@ -85,36 +232,41 @@ wqtree_palloc(wqtree_t** dst, struct wmemp_t* mp)
     return nbytes;
 }
 
-void
-wqtree_setcallback(wqtree_t* tree, wqtree_callback cb, void* udt)
-{
-    tree->vcb = cb;
-    tree->udt = udt;
-}
-
 static wqnode_t*
-wqtree_getprnt(wqtree_t* tree, const char* uri)
+wqtree_getparent(wqtree_t* tree, const char* uri)
 {
+    wqnode_t* target = &tree->root;
+    // we're looking for /foo/bar/int parent
+    // look for /foo first
+    // if /foo exists, set target to /foo and look for /foo/bar
+    // if /foo doesn't exist, set it to root
+    // we have to allocate a string here, of the same size as uri
+    int len;
+    struct wstr_t* str;
+    char* strdat;
+    len = strlen(uri);
+    wmemp_req0(tree->ptr, sizeof(struct wstr_t)+len, (void**)&str);
+    //..
 
     return 0;
 }
 
 int
 wqtree_addnd(wqtree_t* tree, const char* uri,
-             enum wqtype_t wqtype, wqnode_t** dst)
+             enum wqtype_t type, wqnode_t** dst)
 {
     int err = 0;
-    wqnode_t* prnt, *nwnd;
-    if (!wosc_checkuri(uri))
+    wqnode_t* parent, *nd;
+    if (wosc_checkuri(uri))
         return WQUERY_URI_INVALID;
-    if ((err = wqnode_palloc(&nwnd, tree->ptr)) < 0)
+    if ((err = wqnode_palloc(&nd, tree->ptr)) < 0)
         return err;
-    prnt = wqtree_getprnt(tree, uri);
-    nwnd->value.t = wqtype;
-    wqnode_seturi(tree, nwnd, uri);
-    wqnode_addnxt(prnt, nwnd);
-    *dst = nwnd;
-    return err;
+    parent = wqtree_getparent(tree, uri);
+    wqnode_settype(nd, type);
+    wqnode_seturi(nd, uri);
+    wqnode_addchd(parent, nd);
+    *dst = nd;
+    return 0;
 }
 
 int
@@ -142,9 +294,18 @@ wqtree_addndc(wqtree_t* tree, const char* uri, wqnode_t** dst)
 }
 
 int
-wqtree_addnds(wqtree_t* tree, const char* uri, wqnode_t** dst)
+wqtree_addnds(wqtree_t* tree, const char* uri,
+              wqnode_t** dst, int strlim)
 {
-    return wqtree_addnd(tree, uri, WQTYPE_STRING, dst);
+    int err;
+    if ((err = wqtree_addnd(tree, uri, WQTYPE_STRING, dst)))
+        return err;
+    // todo: distinguish MALLOC from MEMP
+    if ((err = wmemp_req0(tree->ptr, sizeof(struct wstr_t)+strlim,
+               (void**)&((*dst)->value.u.s))) < 0)
+        return err;
+    (*dst)->value.u.s->cap = strlim;
+    return 0;
 }
 
 wqnode_t*
