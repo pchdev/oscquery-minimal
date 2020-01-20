@@ -248,7 +248,7 @@ womsg_writec(struct womsg* msg, char value)
 int
 womsg_writeb(struct womsg* msg, bool value)
 {
-    // no need to set the value is tag has already been set obviously..
+    // no need to set the value if tag has already been set obviously..
     if (msg->mode == WOMSG_WTAGLOCKED)
         return 4;
     return 1;

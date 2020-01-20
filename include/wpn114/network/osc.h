@@ -7,6 +7,10 @@
 #include <alloca.h>
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct womsg womsg_t;
 typedef struct wobdl wobdl_t;
 
@@ -117,4 +121,7 @@ int womsg_readc(womsg_t* msg, char* dst) __nonnull((1));
 int womsg_reads(womsg_t* msg, char** dst) __nonnull((1));
 int womsg_readv(womsg_t* msg, wvalue_t* dst) __nonnull((1));
 
+#ifdef __cplusplus
+}
+#endif
 #endif

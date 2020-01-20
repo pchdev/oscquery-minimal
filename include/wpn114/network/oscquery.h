@@ -5,7 +5,9 @@
 #include <wpn114/network/osc.h>
 #include <wpn114/mempool.h>
 
-typedef struct wq0conf wq0conf_t;
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 extern const char*
 wquery_strerr(int err);
@@ -16,7 +18,9 @@ enum wquery_err {
     WQUERY_BINDERR_TCP,
     WQUERY_URI_INVALID,
     WQUERY_TYPE_MISMATCH,
-    WQUERY_STRBUF_OVERFLOW
+    WQUERY_STRBUF_OVERFLOW,
+    WQUERY_JBUF_OVERFLOW,
+    WQUERY_ATTR_UNSUPPORTED
 };
 
 enum wqflags_t {
@@ -140,4 +144,7 @@ extern int
 wqclient_disconnect(wqclient_t* client)
 __nonnull((1));
 
+#ifdef __cplusplus
+}
+#endif
 #endif

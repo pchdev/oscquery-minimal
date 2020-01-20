@@ -31,11 +31,13 @@ option(WPN_MULTITHREAD "enables/disables multithread processing" ON)
 set(PROJECT_HEADER_FILES ${PROJECT_HEADER_FILES}
     ${WPN_HEADERS_DIR}/network/osc.h
     ${WPN_HEADERS_DIR}/network/oscquery.h
+    ${WPN_HEADERS_DIR}/network/zeroconf.h
     ${WPN_DEPENDENCIES_DIR}/mongoose/mongoose.h
     ${WPN_DEPENDENCIES_DIR}/mjson/mjson.h)
 set(PROJECT_SOURCE_FILES ${PROJECT_SOURCE_FILES}
     ${WPN_SOURCES_DIR}/network/osc.c
     ${WPN_SOURCES_DIR}/network/oscquery.c
+    ${WPN_SOURCES_DIR}/network/zeroconf.c
     ${WPN_DEPENDENCIES_DIR}/mongoose/mongoose.c)
 
 if (WPN_TESTS)

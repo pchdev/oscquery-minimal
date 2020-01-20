@@ -2,23 +2,28 @@
 #define WPN_TYPES_H
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <wpn114/mempool.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /* Used for raw data buffers, such as midi
  * we use unsigned for these */
 typedef uint8_t byte_t;
 
 enum wtype_t {
-    WTYPE_NIL,
-    WTYPE_INT,
-    WTYPE_FLOAT,
-    WTYPE_CHAR,
-    WTYPE_BOOL,
-    WTYPE_STRING,
-    WTYPE_PULSE,
-    WTYPE_VEC2F,
-    WTYPE_VEC3F,
-    WTYPE_VEC4F,
+    WTYPE_NIL,      // N
+    WTYPE_INT,      // i
+    WTYPE_FLOAT,    // f
+    WTYPE_CHAR,     // c
+    WTYPE_BOOL,     // T/F
+    WTYPE_STRING,   // s
+    WTYPE_PULSE,    // ..
+    WTYPE_VEC2F,    // [ff]
+    WTYPE_VEC3F,    // [fff]
+    WTYPE_VEC4F,    // [ffff]
     WTYPE_INVALID
 };
 
@@ -49,4 +54,7 @@ typedef struct {
     enum wtype_t t;
 } wvalue_t;
 
+#ifdef __cplusplus
+}
+#endif
 #endif

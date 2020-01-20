@@ -1,8 +1,17 @@
 #include <wpn114/network/oscquery.h>
 #include <wpn114/utilities.h>
+#include <dependencies/mjson/mjson.h>
 
 #define WQNODE_IGNORE 0
 #define WQNODE_LISTEN 1
+
+#ifndef WPN114_MAXPATH
+    #define WPN114_MAXPATH  256
+#endif
+
+#ifndef WPN114_MAXJSON
+    #define WPN114_MAXJSON  1024
+#endif
 
 const char*
 wquery_strerr(int err)
@@ -199,9 +208,8 @@ int
 wqnode_geti(wqnode_t* nd, int* i)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WTYPE_INT))) {
+    if (!(err = wqnode_checktp(nd, WTYPE_INT)))
         *i = nd->value.u.i;
-    }
     return err;
 }
 
@@ -209,9 +217,8 @@ int
 wqnode_getf(wqnode_t* nd, float* f)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WTYPE_FLOAT))) {
+    if (!(err = wqnode_checktp(nd, WTYPE_FLOAT)))
         *f = nd->value.u.f;
-    }
     return err;
 }
 
@@ -219,9 +226,8 @@ int
 wqnode_getc(wqnode_t* nd, char* c)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WTYPE_CHAR))) {
+    if (!(err = wqnode_checktp(nd, WTYPE_CHAR)))
         *c = nd->value.u.c;
-    }
     return err;
 }
 
@@ -229,23 +235,102 @@ int
 wqnode_gets(wqnode_t* nd, const char** s)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WTYPE_STRING))) {
+    if (!(err = wqnode_checktp(nd, WTYPE_STRING)))
         *s = nd->value.u.s->dat;
-    }
     return err;
 }
 
-static int
-wqnode_printj(wqnode_t* nd, char* buf, int len)
+static inline const char*
+wqnode_getname(wqnode_t* nd)
 {
-    return 1;
+    int len;
+    const char* name;
+    len = strlen(nd->uri);
+    name = &nd->uri[len-1];
+    while (*name-- != '/');
+    return ++name;
 }
+
+static int
+wqnode_contents_printj(wqnode_t* nd, char* buf, int len);
 
 static int
 wqnode_attr_printj(wqnode_t* nd, const char* attr,
                    char* buf, int len)
 {
-    return 1;
+    if (strcmp(attr, "VALUE") == 0) {
+        switch (nd->value.t) {
+        // TOOO: check and return proper error if buffer overflow
+        case WTYPE_INT:     return sprintf(buf, "\%s\": %d", attr, nd->value.u.i);
+        case WTYPE_FLOAT:   return sprintf(buf, "\%s\": %f", attr, nd->value.u.f);
+        case WTYPE_CHAR:    return sprintf(buf, "\%s\": %c", attr, nd->value.u.c);
+        case WTYPE_STRING:  return sprintf(buf, "\%s\": \"%s\"", attr, nd->value.u.s->dat);
+        case WTYPE_BOOL:    return sprintf(buf, "\%s\": %s", attr, nd->value.u.b ? "true":"false");
+        default:            return WQUERY_TYPE_MISMATCH;
+        }
+    } else if (strcmp(attr, "TYPE") == 0) {
+        return sprintf(buf, "\"%s\": %c", attr, wosc_tp2tag(nd->value.t));
+    } else if (strcmp(attr, "ACCESS") == 0) {
+        return sprintf(buf, "\"%s\": %d", attr, wqnode_getaccess(nd));
+    } else if (strcmp(attr, "CRITICAL") == 0) {
+        if (nd->flags & WQNODE_CRITICAL)
+            return sprintf(buf, "\%s\": true", attr);
+        else
+            return 0;
+    } else if (strcmp(attr, "REPETITION_FILTER") == 0) {
+        if (nd->flags & WQNODE_NOREPEAT)
+            return sprintf(buf, "\%s\": true", attr);
+        else
+            return 0;
+    }
+    return WQUERY_ATTR_UNSUPPORTED;
+}
+
+static int
+wqnode_printj(wqnode_t* nd, char* buf, int len)
+{
+    const char* name;
+    int lenp;
+    name = wqnode_getname(nd);
+    lenp = strlen(name)
+         + strlen(nd->uri)
+         + 25;
+    if (lenp >= len)
+        return WQUERY_JBUF_OVERFLOW;
+    else
+        sprintf(buf, "{ \"%s\": { \"FULL_PATH\": %s", name, nd->uri);
+    if (nd->value.t != WTYPE_NIL) {
+        if ((lenp += wqnode_attr_printj(nd, "TYPE", buf+lenp, len)) >= len ||
+            (lenp += wqnode_attr_printj(nd, "VALUE", buf+lenp, len) >= len) ||
+            (lenp += wqnode_attr_printj(nd, "ACCESS", buf+lenp, len) >= len) ||
+            (lenp += wqnode_attr_printj(nd, "CRITICAL", buf+lenp, len) >= len) ||
+            (lenp += wqnode_attr_printj(nd, "REPETITION_FILTER", buf+lenp, len) >= len)) {
+            return WQUERY_JBUF_OVERFLOW;
+        }
+    }
+    if ((lenp += wqnode_contents_printj(nd, buf+lenp, len)) >= len)
+        return WQUERY_JBUF_OVERFLOW;
+    strcat(buf, " }");
+    return 0;
+}
+
+static int
+wqnode_contents_printj(wqnode_t* nd, char* buf, int len)
+{
+    int err;
+    if (!nd->chd)
+        return 0;
+    // todo:
+    // if there are any intermediate containers, print them as well..
+    strcat(buf, "\"CONTENTS\": ");
+    wqnode_t* child;
+    child = nd->chd;
+    err = wqnode_printj(nd, buf, len);
+    while (child->sib) {
+        err = wqnode_printj(child->sib, buf, len);
+        child = child->sib;
+    }
+    return err;
 }
 
 #define WQTREE_F_MALLOC     1
@@ -440,21 +525,13 @@ wqtree_update(wqtree_t* tree, womsg_t* womsg)
 // ------------------------------------------------------------------------------------------------
 
 #include <dependencies/mongoose/mongoose.h>
-#include <dependencies/mjson/mjson.h>
+
 
 #define HTTP_OK             200
 #define HTTP_MIME_JSON      "Content-Type: application/json"
 
 #ifndef WPN114_MAXCN
     #define WPN114_MAXCN    1
-#endif
-
-#ifndef WPN114_MAXPATH
-    #define WPN114_MAXPATH  256
-#endif
-
-#ifndef WPN114_MAXJSON
-    #define WPN114_MAXJSON  1024
 #endif
 
 struct wqconnection {
@@ -527,6 +604,7 @@ wqserver_getcn(wqserver_t* server, struct mg_connection* mgc)
     return NULL;
 }
 
+// better to omit fields that are 'false'?
 static const char* s_host_ext =
         "{ "
         "\"ACCESS\": true,"
