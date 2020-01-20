@@ -515,18 +515,7 @@ wqnode_update(wqnode_t* nd, womsg_t* womsg)
 }
 
 static int
-wqtree_update(wqtree_t* tree, womsg_t* womsg)
-{
-    const char* uri;
-    wqnode_t* target;
-    uri = womsg_geturi(womsg);
-    if ((target = wqtree_getnd(tree, uri)) == NULL)
-        return WQUERY_URI_INVALID;
-    return wqnode_update(target, womsg);
-}
-
-static void
-wqtree_parse_update(wqtree_t* tree, byte_t* data, int len)
+wqtree_update_osc(wqtree_t* tree, byte_t* data, int len)
 {
     int err;
     womsg_t* womsg;
@@ -534,8 +523,14 @@ wqtree_parse_update(wqtree_t* tree, byte_t* data, int len)
     if ((err = womsg_decode(womsg, data, len))) {
         wpnerr("decoding incoming OSC message (%s)\n",
                wosc_strerr(err));
+        return err;
     } else {
-        wqtree_update(tree, womsg);
+        const char* uri;
+        wqnode_t* target;
+        uri = womsg_geturi(womsg);
+        if ((target = wqtree_getnd(tree, uri)) == NULL)
+            return WQUERY_URI_INVALID;
+        return wqnode_update(target, womsg);
     }
 }
 
@@ -707,7 +702,7 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
             }
         } else if (wm->flags & WEBSOCKET_OP_BINARY) {
             // parse OSC
-            wqtree_parse_update(server->tree, wm->data, wm->size);
+            wqtree_update_osc(server->tree, wm->data, wm->size);
         }
 
         break;
@@ -761,7 +756,7 @@ wqserver_udp_hdl(struct mg_connection* mgc, int event, void* data)
     (void) data;
     switch (event) {
     case MG_EV_RECV: {
-        wqtree_parse_update(server->tree,
+        wqtree_update_osc(server->tree,
             (byte_t*) mgc->recv_mbuf.buf,
             mgc->recv_mbuf.len);
     }
@@ -872,9 +867,10 @@ wqclient_tcp_hdl(struct mg_connection* mgc, int event, void* data)
     case MG_EV_WEBSOCKET_FRAME: {
         struct websocket_message* wm = data;
         if (wm->flags & WEBSOCKET_OP_TEXT) {
-            // there should not be any text reply here..
+            // we shouldn't receive anything here
+            wpnerr("dave, this is highly irregular..");
         } else if (wm->flags & WEBSOCKET_OP_BINARY) {
-            wqtree_parse_update(&cli->tree, wm->data, wm->size);
+            wqtree_update_osc(&cli->tree, wm->data, wm->size);
         }
         break;
     }
@@ -911,7 +907,7 @@ wqclient_udp_hdl(struct mg_connection* mgc, int event, void* data)
     wqclient_t* cli = mgc->mgr->user_data;
     switch (event) {
     case MG_EV_RECV: {
-        wqtree_parse_update(&cli->tree,
+        wqtree_update_osc(&cli->tree,
             (byte_t*) mgc->recv_mbuf.buf, mgc->recv_mbuf.len);
         break;
     }
