@@ -858,16 +858,15 @@ wqclient_tcp_hdl(struct mg_connection* mgc, int event, void* data)
     case MG_EV_CONNECT:
     case MG_EV_POLL: break;
     case MG_EV_WEBSOCKET_HANDSHAKE_DONE: {
-        char cmd[128];
-        int err;
-        err = mjson_printf(&mjson_print_fixed_buf, cmd,
-                           "{%Q:%s, %Q:{%Q:%d, %Q:%d}}",
-                           "COMMAND", "START_OSC_STREAMING",
-                           "DATA",
-                           "LOCAL_SERVER_PORT", 1234,
-                           "LOCAL_SENDER_PORT", 0);
-        mg_send_websocket_frame(mgc, WEBSOCKET_OP_TEXT,
-                                cmd, strlen(cmd));
+        // once handshake is done, request both host_info & json tree
+        char addr[32], port[8];
+        char url[64];
+        mg_sock_addr_to_str(&cli->cn.tcp->sa, addr, sizeof(addr), MG_SOCK_STRINGIFY_IP);
+        mg_sock_addr_to_str(&cli->cn.tcp->sa, port, sizeof(port), MG_SOCK_STRINGIFY_PORT);
+        sprintf(url, "ws://%s:%s/", addr, port);
+        mg_connect_http(&cli->mgr, wqclient_tcp_hdl, url, NULL, NULL);
+        strcat(url, "?HOST_INFO");
+        mg_connect_http(&cli->mgr, wqclient_tcp_hdl, url, NULL, NULL);
         break;
     }
     case MG_EV_WEBSOCKET_FRAME: {
@@ -882,9 +881,20 @@ wqclient_tcp_hdl(struct mg_connection* mgc, int event, void* data)
     case MG_EV_HTTP_REPLY: {
         struct http_message* hm = data;
         if (strcmp(hm->query_string.p, "HOST_INFO") == 0) {
+            char cmd[128];
             double uport;
+            int err;
             mjson_get_number(hm->body.p, hm->body.len, "$.OSC_PORT", &uport);
             cli->cn.udp = uport;
+            // send back confirmation message, with our own udp port
+            err = mjson_printf(&mjson_print_fixed_buf, cmd,
+                               "{%Q:%s, %Q:{%Q:%d, %Q:%d}}",
+                               "COMMAND", "START_OSC_STREAMING",
+                               "DATA",
+                               "LOCAL_SERVER_PORT", 1234,
+                               "LOCAL_SENDER_PORT", 0);
+            mg_send_websocket_frame(mgc, WEBSOCKET_OP_TEXT,
+                                    cmd, strlen(cmd));
         }
         break;
     }
