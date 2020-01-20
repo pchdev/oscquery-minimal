@@ -27,15 +27,19 @@ wosc_tag2tp(char tag)
     }
 }
 
-enum womsg_err {
-    WOMSG_NOERROR,
-    WOMSG_READ_ONLY,
-    WOMSG_WRITE_ONLY,
-    WOMSG_TAG_MISMATCH,
-    WOMSG_TAG_END,
-    WOMSG_BUFFER_OVERFLOW,
-    WOMSG_URI_INVALID
-};
+char
+wosc_tp2tag(enum wtype_t tp)
+{
+    switch (tp) {
+    case WTYPE_INT:     return 'i';
+    case WTYPE_FLOAT:   return 'f';
+    case WTYPE_BOOL:    return 'b';
+    case WTYPE_CHAR:    return 'c';
+    case WTYPE_STRING:  return 's';
+    case WTYPE_NIL:     return 'N';
+    default:            return 0;
+    }
+}
 
 #define WOMSG_INVALID       0u
 #define WOMSG_WTAGLOCKED    1u
@@ -47,6 +51,38 @@ enum womsg_err {
 #define _tagnc(_womsg)      (_tag(_womsg)+1)
 #define _nexttag(_womsg)    (*(_tagnc(_womsg)+_womsg->idx))
 
+enum womsg_err {
+    WOMSG_NOERROR,
+    WOMSG_READ_ONLY,
+    WOMSG_WRITE_ONLY,
+    WOMSG_TAG_MISMATCH,
+    WOMSG_TAG_END,
+    WOMSG_BUFFER_OVERFLOW,
+    WOMSG_URI_INVALID
+};
+
+const char*
+wosc_strerr(int err)
+{
+    switch (err) {
+    case WOMSG_NOERROR:
+        return "no error";
+    case WOMSG_READ_ONLY:
+        return "message is in read-only mode";
+    case WOMSG_WRITE_ONLY:
+        return "message is in write-only mode";
+    case WOMSG_TAG_MISMATCH:
+        return "mismatching argument tag for read/write function";
+    case WOMSG_TAG_END:
+        return "reaching end of arguments";
+    case WOMSG_BUFFER_OVERFLOW:
+        return "buffer overflow";
+    case WOMSG_URI_INVALID:
+        return "invalid method/uri";
+    default:
+        return "unknown error code";
+    }
+}
 
 static __always_inline int
 womsg_npads(int sz)
@@ -217,9 +253,8 @@ int
 womsg_writei(struct womsg* msg, int32_t value)
 {
     int err;
-    if (!(err = womsg_checkw(msg, 'i', sizeof(int32_t)))) {
+    if (!(err = womsg_checkw(msg, 'i', sizeof(int32_t))))
         womsg_write(msg, &value, sizeof(int32_t));
-    }
     return err;
 }
 
@@ -227,9 +262,8 @@ int
 womsg_writef(struct womsg* msg, float value)
 {
     int err;
-    if (!(err = womsg_checkw(msg, 'f', sizeof(float)))) {
+    if (!(err = womsg_checkw(msg, 'f', sizeof(float))))
         womsg_write(msg, &value, sizeof(float));
-    }
     return err;
 }
 
@@ -239,9 +273,8 @@ womsg_writec(struct womsg* msg, char value)
     int err;
     // we convert to int32
     int32_t c = value;
-    if (!(err = womsg_checkw(msg, 'c', sizeof(int32_t)))) {
+    if (!(err = womsg_checkw(msg, 'c', sizeof(int32_t))))
         womsg_write(msg, &c, sizeof(int32_t));
-    }
     return err;
 }
 
@@ -301,9 +334,8 @@ int
 womsg_readi(struct womsg* msg, int32_t* dst)
 {    
     int err;
-    if (!(err = womsg_checkr(msg, 'i'))) {
+    if (!(err = womsg_checkr(msg, 'i')))
         womsg_read(msg, dst, sizeof(int32_t));
-    }
     return err;
 }
 
@@ -311,9 +343,8 @@ int
 womsg_readf(struct womsg* msg, float* dst)
 {
     int err;
-    if (!(err = womsg_checkr(msg, 'f'))) {
+    if (!(err = womsg_checkr(msg, 'f')))
         womsg_read(msg, dst, sizeof(float));
-    }
     return err;
 }
 
@@ -355,6 +386,14 @@ womsg_readv(struct womsg* msg, wvalue_t* v)
 {
     v->t = wosc_tag2tp(*womsg_gettag(msg));
     switch (v->t) {
+    case WTYPE_INT:
+        return womsg_readi(msg, &v->u.i);
+    case WTYPE_BOOL:
+        return womsg_readb(msg, &v->u.b);
+    case WTYPE_CHAR:
+        return womsg_readc(msg, &v->u.c);
+    case WTYPE_FLOAT:
+        return womsg_readf(msg, &v->u.f);
     case WTYPE_STRING: {
         int err;
         char* s;
@@ -365,10 +404,6 @@ womsg_readv(struct womsg* msg, wvalue_t* v)
         }
         return err;
     }
-    case WTYPE_INT:     return womsg_readi(msg, &v->u.i);
-    case WTYPE_BOOL:    return womsg_readb(msg, &v->u.b);
-    case WTYPE_CHAR:    return womsg_readc(msg, &v->u.c);
-    case WTYPE_FLOAT:   return womsg_readf(msg, &v->u.f);
-    default:            return 1;
+    default: return 1;
     }
 }

@@ -35,9 +35,10 @@ wquery_strerr(int err)
 int
 wstr_malloc(uint16_t cap, wstr_t** dst)
 {
-    if (((*dst) = malloc(sizeof(wstr_t) + cap))) {
+    if (((*dst) = malloc(sizeof(wstr_t)+ cap))) {
         memset(*dst, 0, sizeof(wstr_t) + cap);
         (*dst)->cap = cap;
+        return 0;
     }
     return 1;
 }
@@ -72,23 +73,22 @@ struct wqnode {
 static int
 wqnode_malloc(wqnode_t** dst)
 {
-    if ((*dst = malloc(sizeof(struct wqnode))) == NULL)
-        return 1;
-    else return 0;
+    return (*dst = malloc(sizeof(struct wqnode))) == NULL;
 }
 
 static int
 wqnode_palloc(wqnode_t** dst, struct wmemp_t* mp)
 {
-    return wmemp_req(mp, sizeof(struct wqnode),
-                    (void**)dst);
+    return wmemp_req(mp, sizeof(struct wqnode), (void**)dst);
 }
 
 static int
 wqnode_seturi(wqnode_t* nd, const char* uri)
 {
-    nd->uri = uri;
-    return 0;
+    int err;
+    if (!(err = wosc_checkuri(uri)))
+        nd->uri = uri;
+    return err;
 }
 
 void
@@ -126,17 +126,10 @@ wqnode_addchd(wqnode_t* nd, wqnode_t* chd)
     return 0;
 }
 
-static inline int
+static __always_inline int
 wqnode_checktp(wqnode_t* nd, enum wtype_t tp)
 {
-    return nd->value.t == tp ?
-           0 : WQUERY_TYPE_MISMATCH;
-}
-
-static inline void
-wqnode_settype(wqnode_t* nd, enum wtype_t tp)
-{
-    nd->value.t = tp;
+    return nd->value.t == tp ? 0 : WQUERY_TYPE_MISMATCH;
 }
 
 static int
@@ -240,7 +233,7 @@ wqnode_gets(wqnode_t* nd, const char** s)
     return err;
 }
 
-static inline const char*
+const char*
 wqnode_getname(wqnode_t* nd)
 {
     int len;
@@ -249,6 +242,17 @@ wqnode_getname(wqnode_t* nd)
     name = &nd->uri[len-1];
     while (*name-- != '/');
     return ++name;
+}
+
+int
+wqnode_getaccess(wqnode_t* nd)
+{
+    if (nd->flags & WQNODE_READONLY)
+        return WQNODE_READONLY;
+    else if (nd->flags & WQNODE_WRITEONLY)
+        return WQNODE_WRITEONLY;
+    else
+        return 3;
 }
 
 static int
@@ -261,11 +265,11 @@ wqnode_attr_printj(wqnode_t* nd, const char* attr,
     if (strcmp(attr, "VALUE") == 0) {
         switch (nd->value.t) {
         // TOOO: check and return proper error if buffer overflow
-        case WTYPE_INT:     return sprintf(buf, "\%s\": %d", attr, nd->value.u.i);
-        case WTYPE_FLOAT:   return sprintf(buf, "\%s\": %f", attr, nd->value.u.f);
-        case WTYPE_CHAR:    return sprintf(buf, "\%s\": %c", attr, nd->value.u.c);
-        case WTYPE_STRING:  return sprintf(buf, "\%s\": \"%s\"", attr, nd->value.u.s->dat);
-        case WTYPE_BOOL:    return sprintf(buf, "\%s\": %s", attr, nd->value.u.b ? "true":"false");
+        case WTYPE_INT:     return sprintf(buf, "\"%s\": %d", attr, nd->value.u.i);
+        case WTYPE_FLOAT:   return sprintf(buf, "\"%s\": %f", attr, nd->value.u.f);
+        case WTYPE_CHAR:    return sprintf(buf, "\"%s\": %c", attr, nd->value.u.c);
+        case WTYPE_STRING:  return sprintf(buf, "\"%s\": \"%s\"", attr, nd->value.u.s->dat);
+        case WTYPE_BOOL:    return sprintf(buf, "\"%s\": %s", attr, nd->value.u.b ? "true":"false");
         default:            return WQUERY_TYPE_MISMATCH;
         }
     } else if (strcmp(attr, "TYPE") == 0) {
@@ -274,12 +278,12 @@ wqnode_attr_printj(wqnode_t* nd, const char* attr,
         return sprintf(buf, "\"%s\": %d", attr, wqnode_getaccess(nd));
     } else if (strcmp(attr, "CRITICAL") == 0) {
         if (nd->flags & WQNODE_CRITICAL)
-            return sprintf(buf, "\%s\": true", attr);
+            return sprintf(buf, "\"%s\": true", attr);
         else
             return 0;
     } else if (strcmp(attr, "REPETITION_FILTER") == 0) {
         if (nd->flags & WQNODE_NOREPEAT)
-            return sprintf(buf, "\%s\": true", attr);
+            return sprintf(buf, "\"%s\": true", attr);
         else
             return 0;
     }
@@ -425,8 +429,7 @@ wqtree_addnd(wqtree_t* tree, const char* uri,
         return err;
     if ((parent = wqtree_getparent(tree, uri)) == NULL)
         return 43; // TODO: add proper error code: not enough memory space
-
-    wqnode_settype(nd, type);
+    nd->value.t = type;
     wqnode_seturi(nd, uri);
     wqnode_addchd(parent, nd);
     *dst = nd;
@@ -480,12 +483,14 @@ wqtree_addnds(wqtree_t* tree, const char* uri,
 wqnode_t*
 wqtree_getnd(wqtree_t* tree, const char* uri)
 {
-    if (!wosc_checkuri(uri)) {
+    if (wosc_checkuri(uri)) {
+        wpnerr("uri: %s, incorrect format\n", uri);
         return NULL;
     }
     if (strlen(uri) == 1)
-        return &tree->root;
-    return 0;
+        return &tree->root;    
+    else
+        return 0;
 }
 
 static int
@@ -520,14 +525,33 @@ wqtree_update(wqtree_t* tree, womsg_t* womsg)
     return wqnode_update(target, womsg);
 }
 
+static void
+wqtree_parse_update(wqtree_t* tree, byte_t* data, int len)
+{
+    int err;
+    womsg_t* womsg;
+    womsg_alloca(&womsg);
+    if ((err = womsg_decode(womsg, data, len))) {
+        wpnerr("decoding incoming OSC message (%s)\n",
+               wosc_strerr(err));
+    } else {
+        wqtree_update(tree, womsg);
+    }
+}
+
 // ------------------------------------------------------------------------------------------------
 // NETWORK
 // ------------------------------------------------------------------------------------------------
 
 #include <dependencies/mongoose/mongoose.h>
 
-
 #define HTTP_OK             200
+#define HTTP_NO_CONTENT     204
+#define HTTP_BAD_REQUEST    400
+#define HTTP_FORBIDDEN      403
+#define HTTP_NOT_FOUND      404
+#define HTTP_REQ_TIME_OUT   408
+
 #define HTTP_MIME_JSON      "Content-Type: application/json"
 
 #ifndef WPN114_MAXCN
@@ -557,17 +581,13 @@ struct wqserver {
 int
 wqserver_malloc(wqserver_t** dst)
 {
-    if ((*dst = malloc(sizeof(struct wqserver))) == NULL)
-        return 1;
-    else
-        return 0;
+    return (*dst = malloc(sizeof(struct wqserver))) == NULL;
 }
 
 int
 wqserver_palloc(wqserver_t** dst, struct wmemp_t* mp)
 {
-    return wmemp_req(mp, sizeof(struct wqserver),
-                     (void**)dst);
+    return wmemp_req(mp, sizeof(struct wqserver), (void**)dst);
 }
 
 void
@@ -605,26 +625,26 @@ wqserver_getcn(wqserver_t* server, struct mg_connection* mgc)
 }
 
 // better to omit fields that are 'false'?
-static const char* s_host_ext =
-        "{ "
+static const char*
+s_host_ext =
+    "{ "
         "\"ACCESS\": true,"
         "\"VALUE\": true,"
-        "\"DESCRIPTION\": false,"
-        "\"TAGS\": false,"
-        "\"EXTENDED_TYPE\": false,"
-        "\"UNIT\": false,"
         "\"CRITICAL\": true,"
-        "\"CLIPMODE\": false,"
         "\"LISTEN\": true,"
-        "\"PATH_CHANGED\": false,"
-        "\"PATH_REMOVED\": false,"
-        "\"PATH_ADDED\": false,"
-        "\"PATH_RENAMED\": false,"
-        "\"OSC_STREAMING\": true,"
-        "\"HTML\": false,"
-        "\"ECHO\": false "
-        "}"
-        ;
+//        "\"DESCRIPTION\": false,"
+//        "\"TAGS\": false,"
+//        "\"EXTENDED_TYPE\": false,"
+//        "\"UNIT\": false,"
+//        "\"CLIPMODE\": false,"
+//        "\"PATH_CHANGED\": false,"
+//        "\"PATH_REMOVED\": false,"
+//        "\"PATH_ADDED\": false,"
+//        "\"PATH_RENAMED\": false,"
+//        "\"HTML\": false,"
+//        "\"ECHO\": false, "
+        "\"OSC_STREAMING\": true"
+    "}";
 
 static inline int
 wqserver_reply_json(struct mg_connection* mgc,
@@ -658,35 +678,36 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
         if (wm->flags & WEBSOCKET_OP_TEXT) {
             // parse json
             char cmd[32];
-            mjson_get_string((char*)wm->data, wm->size, "$.COMMAND", cmd, sizeof(cmd));
+            mjson_get_string((char*)wm->data, wm->size,
+                             "$.COMMAND", cmd, sizeof(cmd));
 
             if (strcmp(cmd, "LISTEN") == 0) {
                 char path[WPN114_MAXPATH];
                 wqnode_t* target;
-                mjson_get_string((char*)wm->data, wm->size, "$.DATA", path, sizeof(path));
+                mjson_get_string((char*)wm->data, wm->size,
+                                 "$.DATA", path, sizeof(path));
                 if ((target = wqtree_getnd(server->tree, path))) {
                     target->status = WQNODE_LISTEN;
                 }
             } else if (strcmp(cmd, "IGNORE") == 0) {
                 char path[WPN114_MAXPATH];
                 wqnode_t* target;
-                mjson_get_string((char*)wm->data, wm->size, "$.DATA", path, sizeof(path));
+                mjson_get_string((char*)wm->data, wm->size,
+                                 "$.DATA", path, sizeof(path));
                 if ((target = wqtree_getnd(server->tree, path))) {
                     target->status = WQNODE_IGNORE;
                 }
             } else if (strcmp(cmd, "START_OSC_STREAMING") == 0) {
                 struct wqconnection* wqc;
                 double port;
-                mjson_get_number((char*)wm->data, wm->size, "$.DATA.LOCAL_SERVER_PORT", &port);
+                mjson_get_number((char*)wm->data, wm->size,
+                                 "$.DATA.LOCAL_SERVER_PORT", &port);
                 if ((wqc = wqserver_getcn(server, mgc)))
                     wqc->udp = port;
             }
         } else if (wm->flags & WEBSOCKET_OP_BINARY) {
             // parse OSC
-            womsg_t* womsg;
-            womsg_alloca(&womsg);
-            womsg_decode(womsg, wm->data, wm->size);
-            wqtree_update(server->tree, womsg);
+            wqtree_parse_update(server->tree, wm->data, wm->size);
         }
 
         break;
@@ -740,10 +761,9 @@ wqserver_udp_hdl(struct mg_connection* mgc, int event, void* data)
     (void) data;
     switch (event) {
     case MG_EV_RECV: {
-        womsg_t* womsg;
-        womsg_alloca(&womsg);
-        womsg_decode(womsg, (byte_t*)mgc->recv_mbuf.buf, mgc->recv_mbuf.len);
-        wqtree_update(server->tree, womsg);
+        wqtree_parse_update(server->tree,
+            (byte_t*) mgc->recv_mbuf.buf,
+            mgc->recv_mbuf.len);
     }
     }
 }
@@ -804,10 +824,7 @@ struct wqclient {
 int
 wqclient_malloc(wqclient_t** dst)
 {
-    if ((*dst = malloc(sizeof(struct wqclient))) == NULL)
-        return 1;
-    else
-        return 0;
+    return (*dst = malloc(sizeof(struct wqclient))) == NULL;
 }
 
 int
@@ -838,12 +855,8 @@ wqclient_tcp_hdl(struct mg_connection* mgc, int event, void* data)
 {
     wqclient_t* cli = mgc->mgr->user_data;
     switch (event) {
-    case MG_EV_CONNECT: {
-        break;
-    }
-    case MG_EV_POLL: {
-        break;
-    }
+    case MG_EV_CONNECT:
+    case MG_EV_POLL: break;
     case MG_EV_WEBSOCKET_HANDSHAKE_DONE: {
         char cmd[128];
         int err;
@@ -862,10 +875,7 @@ wqclient_tcp_hdl(struct mg_connection* mgc, int event, void* data)
         if (wm->flags & WEBSOCKET_OP_TEXT) {
             // there should not be any text reply here..
         } else if (wm->flags & WEBSOCKET_OP_BINARY) {
-            womsg_t* womsg;
-            womsg_alloca(&womsg);
-            womsg_decode(womsg, (byte_t*)mgc->recv_mbuf.buf, mgc->recv_mbuf.len);
-            wqtree_update(&cli->tree, womsg);
+            wqtree_parse_update(&cli->tree, wm->data, wm->size);
         }
         break;
     }
@@ -891,10 +901,8 @@ wqclient_udp_hdl(struct mg_connection* mgc, int event, void* data)
     wqclient_t* cli = mgc->mgr->user_data;
     switch (event) {
     case MG_EV_RECV: {
-        womsg_t* womsg;
-        womsg_alloca(&womsg);
-        womsg_decode(womsg, (byte_t*)mgc->recv_mbuf.buf, mgc->recv_mbuf.len);
-        wqtree_update(&cli->tree, womsg);
+        wqtree_parse_update(&cli->tree,
+            (byte_t*) mgc->recv_mbuf.buf, mgc->recv_mbuf.len);
         break;
     }
     }

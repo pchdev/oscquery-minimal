@@ -26,8 +26,10 @@ const char*
 wosc_strerr(int err);
 
 enum wtype_t
-wosc_tag2tp(char tag)
-__nonnull((1));
+wosc_tag2tp(char tag);
+
+char
+wosc_tp2tag(enum wtype_t tp);
 
 int
 wosc_checkuri(const char* uri)

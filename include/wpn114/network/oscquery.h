@@ -25,9 +25,9 @@ enum wquery_err {
 
 enum wqflags_t {
     WQNODE_CRITICAL,
-    WQNODE_NOREPEAT,
     WQNODE_READONLY,
     WQNODE_WRITEONLY,
+    WQNODE_NOREPEAT,
     WQNODE_FN_SETPRE,
     WQNODE_FN_SETPOST,
 };
@@ -48,6 +48,14 @@ __nonnull((1));
 extern void
 wqnode_setfn(wqnode_t* node, wqnode_fn fn, void* udata)
 __nonnull((1, 2));
+
+extern int
+wqnode_getaccess(wqnode_t* node)
+__nonnull((1));
+
+extern const char*
+wqnode_getname(wqnode_t* nd)
+__nonnull((1));
 
 extern int wqnode_seti(wqnode_t* node, int i) __nonnull((1));;
 extern int wqnode_setf(wqnode_t* node, float f) __nonnull((1));;
