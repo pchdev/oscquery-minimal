@@ -31,6 +31,8 @@ wosc_tag2tp(char tag);
 char
 wosc_tp2tag(enum wtype_t tp);
 
+/** Checks OSC method/uri for irregularities.
+ * Returns zero if format is correct, >0 if incorrect */
 int
 wosc_checkuri(const char* uri)
 __nonnull((1));
@@ -66,15 +68,17 @@ const char*
 womsg_geturi(womsg_t* msg)
 __nonnull((1));
 
-/** returns negative count if an error has occured. */
+/** Returns message's total length (in bytes) */
 int
 womsg_getlen(womsg_t* msg)
 __nonnull((1));
 
+/** Returns message's total number of arguments */
 int
 womsg_getcnt(womsg_t* msg)
 __nonnull((1));
 
+/* Returns message's argument tagline */
 const char*
 womsg_gettag(womsg_t* msg)
 __nonnull((1));
@@ -99,7 +103,7 @@ __nonnull((1));
 //                        a close brace tag is reached.
 // ]                    | Indicates the end on an array.
 
-// we make a small modification, for convenience: b will be boolean, B will be OSC-blob...
+
 int womsg_writei(womsg_t* msg, int32_t value) __nonnull((1));
 int womsg_writef(womsg_t* msg, float value) __nonnull((1));
 int womsg_writeb(womsg_t* msg, bool value) __nonnull((1));

@@ -40,7 +40,7 @@ ndc_fn(wqnode_t* nd, wvalue_t* v, void* udt)
 void
 nds_fn(wqnode_t* nd, wvalue_t* v, void* udt)
 {
-//    wpnout("/foo/bar/float value: %s\n", v->u.s);
+    wpnout("/foo/bar/float value: %s\n", v->u.s->dat);
 }
 
 wpn_declstatic_mp(wqnmp, 512);
@@ -69,9 +69,9 @@ wquery_unittest_01(void)
 
     wqnode_setfl(ind, WQNODE_CRITICAL | WQNODE_FN_SETPRE);
     wqnode_setfl(fnd, WQNODE_NOREPEAT | WQNODE_FN_SETPRE);
-    wqnode_setfl(bnd, WQNODE_CRITICAL | WQNODE_FN_SETPOST);
-    wqnode_setfl(cnd, WQNODE_CRITICAL | WQNODE_FN_SETPOST);
-    wqnode_setfl(snd, WQNODE_CRITICAL | WQNODE_FN_SETPOST);
+    wqnode_setfl(bnd, WQNODE_CRITICAL);
+    wqnode_setfl(cnd, WQNODE_CRITICAL);
+    wqnode_setfl(snd, WQNODE_CRITICAL);
 
     wqnode_seti(ind, 43);
     wqnode_setf(fnd, 47.31);

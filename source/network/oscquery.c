@@ -480,17 +480,45 @@ wqtree_addnds(wqtree_t* tree, const char* uri,
     return 0;
 }
 
+static wqnode_t*
+wqtree_getnd_rec(wqnode_t* target, const char* uri, int len, int thresh)
+{
+    int spn;
+    if ((spn = strspn(target->uri, uri)) == len) {
+        // target found
+        return target;
+    } else if (spn > thresh) {
+        // we have a partial identification (intermediate node)
+        // do the same with children
+        target = wqtree_getnd_rec(target->chd, uri, len, spn);
+    } else {
+        // no identification, try with siblings
+        while (target)
+            target = wqtree_getnd_rec(target->sib, uri, len, spn);
+    }
+    return target;
+}
+
 wqnode_t*
 wqtree_getnd(wqtree_t* tree, const char* uri)
 {
+    wqnode_t* target;
     if (wosc_checkuri(uri)) {
         wpnerr("uri: %s, incorrect format\n", uri);
         return NULL;
+    }    
+    target = &tree->root;
+    if (strlen(uri) > 1) {
+        int len;
+        target = target->chd;
+        len = strlen(uri);
+        // intermediate nodes are not necessarily created
+        // e.g.: /foo/bar/float will be a child of root (/)
+        // if we follow the test example
+        // that means that 'foo' and 'bar' nodes are omitted in that case
+        target = wqtree_getnd_rec(target, uri, len, 1);
     }
-    if (strlen(uri) == 1)
-        return &tree->root;    
-    else
-        return 0;
+    return target;
 }
 
 static int
@@ -704,7 +732,6 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
             // parse OSC
             wqtree_update_osc(server->tree, wm->data, wm->size);
         }
-
         break;
     }
     case MG_EV_HTTP_REQUEST: {

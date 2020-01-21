@@ -24,16 +24,33 @@ enum wquery_err {
 };
 
 enum wqflags_t {
+
+    /// CRITICAL flag: all messages adressing this node will
+    /// transit in TCP instead of UDP, in order to guarantee
+    /// its delivery.
     WQNODE_CRITICAL,
+
+    /// READONLY flag: node's values and attributes cannot be
+    /// modified from outside.
     WQNODE_READONLY,
+
+    /// WRITEONLY flag: node's values and attributes cannot be
+    /// read from outside.
     WQNODE_WRITEONLY,
+
+    /// NOREPEAT flag: when the received value is the same as
+    /// the previous one, callback function won't be triggered
     WQNODE_NOREPEAT,
-    WQNODE_FN_SETPRE,
-    WQNODE_FN_SETPOST,
+
+    /// FN_SETPRE flag: value callback function will be triggered
+    /// before the value is actually set.
+    WQNODE_FN_SETPRE,   
 };
 
 typedef struct wqnode wqnode_t;
 
+/** wqnode value callback function type definition.
+ * will be called each time a new value is received */
 typedef
 void (*wqnode_fn) (
       wqnode_t*,    // target-node
@@ -41,18 +58,23 @@ void (*wqnode_fn) (
       void*         // user-data
 );
 
+/** Sets <node> flags. Returns error if incorrect */
 extern int
 wqnode_setfl(wqnode_t* node, enum wqflags_t flg)
 __nonnull((1));
 
+/** Sets <node> value callback function, which will be
+ * called each time a new value is received */
 extern void
 wqnode_setfn(wqnode_t* node, wqnode_fn fn, void* udata)
 __nonnull((1, 2));
 
+/** Returns <node> access mode (1: R, 2: W, 3: R/W) */
 extern int
 wqnode_getaccess(wqnode_t* node)
 __nonnull((1));
 
+/** Returns <node> name */
 extern const char*
 wqnode_getname(wqnode_t* nd)
 __nonnull((1));
