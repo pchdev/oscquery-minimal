@@ -50,7 +50,9 @@ int
 wmemp_free(struct wmemp_t* mp, void* area,
            size_t nbytes)
 {
-    return 1;
+    memset(area, 0, nbytes);
+    mp->usd -= nbytes;
+    return 0;
 }
 
 /* Returns free space (in bytes) remaining in mempool <mp> */

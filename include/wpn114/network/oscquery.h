@@ -23,7 +23,15 @@ enum wquery_err {
     WQUERY_ATTR_UNSUPPORTED
 };
 
+enum wqaccess_t {
+    WQNODE_ACCESS_R = 1,
+    WQNODE_ACCESS_W = 2,
+    WQNODE_ACCESS_RW = 3
+};
+
 enum wqflags_t {
+
+    WQTREE_CREATE_INTERMEDIATE,
 
     /// CRITICAL flag: all messages adressing this node will
     /// transit in TCP instead of UDP, in order to guarantee
@@ -100,6 +108,10 @@ __nonnull((1));
 extern int
 wqtree_palloc(wqtree_t** dst, struct wmemp_t* mp)
 __nonnull((1, 2));
+
+extern int
+wqtree_setfl(wqtree_t* tree, enum wqflags_t flags)
+__nonnull((1));
 
 extern int
 wqtree_addnd(wqtree_t* tree, const char* uri, enum wtype_t wtp, wqnode_t** dst)

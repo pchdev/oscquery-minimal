@@ -240,7 +240,8 @@ wqnode_getname(wqnode_t* nd)
     const char* name;
     len = strlen(nd->uri);
     name = &nd->uri[len-1];
-    while (*name-- != '/');
+    while (*--name != '/')
+        ;
     return ++name;
 }
 
@@ -388,6 +389,8 @@ wqnode_getsib(wqnode_t* target, const char* sib)
 static inline wqnode_t*
 wqnode_getchd(wqnode_t* target, const char* chd)
 {
+    if (target->chd == NULL)
+        return target->chd;
     if (strcmp(target->chd->uri, chd))
         return wqnode_getsib(target->chd, chd);
     else
@@ -414,6 +417,7 @@ wqtree_getparent(wqtree_t* tree, const char* uri)
            _uricatnext(uri, str->dat);
            target = child;
     }
+    wmemp_free(tree->ptr, str, sizeof(wstr_t)+str->cap);
     return target;
 }
 

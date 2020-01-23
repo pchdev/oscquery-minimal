@@ -2,6 +2,7 @@
 #include <wpn114/utilities.h>
 #include <signal.h>
 #include <unistd.h>
+#include <assert.h>
 
 static sig_atomic_t
 s_sig = 0;
@@ -45,8 +46,45 @@ nds_fn(wqnode_t* nd, wvalue_t* v, void* udt)
 
 wpn_declstatic_mp(wqnmp, 512);
 
+// simple int node test
 int
 wquery_unittest_01(void)
+{
+    wqtree_t* tree;
+    wqnode_t* ndi;
+    const char* ndi_name;
+    int err, ndi_v;
+    wpnout("allocating wqtree..\n");
+    if ((err = wqtree_palloc(&tree, &wqnmp)) < 0) {
+        return err;
+    }
+    wmemp_rmnprint(&wqnmp);
+    wpnout("allocating wqnode..\n");
+    if ((err = wqtree_addndi(tree, "/foo/bar/int", &ndi))) {
+        return err;
+    }
+    wmemp_rmnprint(&wqnmp);
+    assert(wmemp_rmn(&wqnmp) == 368);
+    ndi_name = wqnode_getname(ndi);
+    assert(strcmp(ndi_name, "int") == 0);
+    assert(wqnode_getaccess(ndi) == WQNODE_ACCESS_RW);
+    assert(wqnode_geti(ndi, &ndi_v) == 0);
+    assert(ndi_v == 0);
+    assert(wqnode_seti(ndi, 47) == 0);
+    wqnode_geti(ndi, &ndi_v);
+    assert(ndi_v == 47);
+    return err;
+}
+
+// test with string node, todo
+int
+wquery_unittest_02(void)
+{
+    return 0;
+}
+
+int
+wquery_unittest_03(void)
 {
     int err;
     wqtree_t* tree;
