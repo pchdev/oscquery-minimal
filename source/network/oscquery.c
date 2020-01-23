@@ -506,13 +506,15 @@ wqtree_getnd_rec(wqnode_t* target, const char* uri, int len, int thresh)
 wqnode_t*
 wqtree_getnd(wqtree_t* tree, const char* uri)
 {
-    wqnode_t* target;
     if (wosc_checkuri(uri)) {
         wpnerr("uri: %s, incorrect format\n", uri);
         return NULL;
     }    
+    wqnode_t* target;
+    int len;
     target = &tree->root;
-    if (strlen(uri) > 1) {
+    len = strlen(uri);
+    if (len > 1) {
         int len;
         target = target->chd;
         len = strlen(uri);
@@ -631,16 +633,6 @@ wqserver_expose(wqserver_t* server, wqtree_t* tree)
     return 0;
 }
 
-static void*
-wqserver_pthread_run(void* v)
-{
-    wqserver_t* server = v;
-    while (server->running) {
-        mg_mgr_poll(&server->mgr, 200);
-    }
-    return 0;
-}
-
 static struct wqconnection*
 wqserver_getcn(wqserver_t* server, struct mg_connection* mgc)
 {
@@ -740,7 +732,7 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
     }
     case MG_EV_HTTP_REQUEST: {
         struct http_message* hm = data;
-        if (strcmp(hm->query_string.p, "HOST_INFO") == 0) {
+        if (hm->query_string.p != NULL) {
             // we should use a static memory pool here
             char buf[WPN114_MAXJSON];
             int err;
@@ -754,28 +746,36 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
             break;
         }
         wqnode_t* target;
-        if ((target = wqtree_getnd(server->tree, hm->uri.p))) {
-            if (hm->query_string.len) {
-                // query attribute
-                // we don't expect it to be too large, maybe 128 bytes would be enough
-                char buf[128];
-                wqnode_attr_printj(target, hm->query_string.p, buf, 128);
-                wqserver_reply_json(mgc, buf);
-            } else {
-                // query all, including subnodes
-                char buf[WPN114_MAXJSON];
-                wqnode_printj(target, buf, WPN114_MAXJSON);
-                wqserver_reply_json(mgc, buf);
-            }
+        if (hm->uri.len == 1)
+            target = wqtree_getnd(server->tree, "/");
+        else {
+            // todo: better to use dynamic allocation/mempool here
+            char uri[WPN114_MAXPATH];
+            memcpy(uri, hm->uri.p, hm->uri.len);
+            uri[hm->uri.len] = 0;
+        }
+        if (hm->query_string.len) {
+            // query attribute
+            // we don't expect it to be too large, maybe 128 bytes would be enough
+            char buf[128];
+            wqnode_attr_printj(target, hm->query_string.p, buf, 128);
+            wqserver_reply_json(mgc, buf);
+        } else {
+            // query all, including subnodes
+            char buf[WPN114_MAXJSON];
+            wqnode_printj(target, buf, WPN114_MAXJSON);
+            wqserver_reply_json(mgc, buf);
         }
         break;
     }
     case MG_EV_CLOSE: {
-        struct wqconnection* wqc;
-        if ((wqc = wqserver_getcn(server, mgc)))
-            memset(wqc, 0, sizeof(struct wqconnection));
-        else
-            wpnerr("couldn't find wqconnection...\n");
+        if (mgc->flags & MG_F_IS_WEBSOCKET) {
+            struct wqconnection* wqc;
+            if ((wqc = wqserver_getcn(server, mgc)))
+                memset(wqc, 0, sizeof(struct wqconnection));
+            else
+                wpnerr("couldn't find wqconnection...\n");
+        }
     }
     }
 }
@@ -794,6 +794,16 @@ wqserver_udp_hdl(struct mg_connection* mgc, int event, void* data)
     }
 }
 
+static void*
+wqserver_pthread_run(void* v)
+{
+    wqserver_t* server = v;
+    while (server->running) {
+        mg_mgr_poll(&server->mgr, 200);
+    }
+    return 0;
+}
+
 int
 wqserver_run(wqserver_t* server, uint16_t udpport, uint16_t wsport)
 {
@@ -808,10 +818,11 @@ wqserver_run(wqserver_t* server, uint16_t udpport, uint16_t wsport)
                  wqserver_tcp_hdl)) == NULL) {
         return WQUERY_BINDERR_TCP;
     }
-    if ((c_udp = mg_bind(&server->mgr, udp_hdr,
-                 wqserver_udp_hdl)) == NULL) {
-        return WQUERY_BINDERR_UDP;
-    }
+    mg_set_protocol_http_websocket(c_tcp);
+//    if ((c_udp = mg_bind(&server->mgr, udp_hdr,
+//                 wqserver_udp_hdl)) == NULL) {
+//        return WQUERY_BINDERR_UDP;
+//    }
     server->running = true;
 #ifdef WPN114_MULTITHREAD
     pthread_create(&server->thread, 0, wqserver_pthread_run, server);

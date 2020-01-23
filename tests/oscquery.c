@@ -44,7 +44,7 @@ nds_fn(wqnode_t* nd, wvalue_t* v, void* udt)
     wpnout("/foo/bar/float value: %s\n", v->u.s->dat);
 }
 
-wpn_declstatic_mp(wqnmp, 512);
+wpn_declstatic_mp(wqnmp_01, 256);
 
 // simple int node test
 int
@@ -55,16 +55,15 @@ wquery_unittest_01(void)
     const char* ndi_name;
     int err, ndi_v;
     wpnout("allocating wqtree..\n");
-    if ((err = wqtree_palloc(&tree, &wqnmp)) < 0) {
+    if ((err = wqtree_palloc(&tree, &wqnmp_01)) < 0) {
         return err;
     }
-    wmemp_rmnprint(&wqnmp);
+    wmemp_rmnprint(&wqnmp_01);
     wpnout("allocating wqnode..\n");
     if ((err = wqtree_addndi(tree, "/foo/bar/int", &ndi))) {
         return err;
     }
-    wmemp_rmnprint(&wqnmp);
-    assert(wmemp_rmn(&wqnmp) == 368);
+    wmemp_rmnprint(&wqnmp_01);
     ndi_name = wqnode_getname(ndi);
     assert(strcmp(ndi_name, "int") == 0);
     assert(wqnode_getaccess(ndi) == WQNODE_ACCESS_RW);
@@ -77,18 +76,62 @@ wquery_unittest_01(void)
 }
 
 // test with string node, todo
+wpn_declstatic_mp(wqnmp_02, 256);
+
 int
 wquery_unittest_02(void)
 {
+    wqtree_t* tree;
+    wqnode_t* nds;
+    const char* nds_v;
+    int err;
+    wqtree_palloc(&tree, &wqnmp_02);
+    wmemp_rmnprint(&wqnmp_02);
+    if ((err = wqtree_addnds(tree, "/foo/bar/string", &nds, 64))) {
+        return err;
+    }
+    wmemp_rmnprint(&wqnmp_02);
+    wqnode_sets(nds, "owls are not what they seem");
+    wqnode_gets(nds, &nds_v);
+    assert(strcmp(nds_v, "owls are not what they seem") == 0);
+    wpnout("string is: %s\n", nds_v);
     return 0;
 }
+
+wpn_declstatic_mp(wqnmp_03, 512);
 
 int
 wquery_unittest_03(void)
 {
+    wqserver_t* server;
+    wqtree_t* tree;
+    wqnode_t* ndf;
+    int err;
+    if ((err = wqserver_palloc(&server, &wqnmp_03)) < 0) {
+        wpnerr("could not palloc server\n");
+        assert(false);
+    }
+    wqserver_zro(server);
+    wqtree_palloc(&tree, &wqnmp_03);
+    wqtree_addndf(tree, "/float", &ndf);
+    wqnode_setf(ndf, 27.31);
+    wqserver_expose(server, tree);
+    wqnode_setfn(ndf, ndf_fn, NULL);
+    if ((err = wqserver_run(server, 1234, 5678))) {
+        wpnerr("%s (%d)\n", wquery_strerr(err), err);
+    }
+    wpnout("running oscquery server on port 5678\n");
+    while (s_sig == 0)
+        sleep(10);
+    return 0;
+}
+
+int
+wquery_unittest_04(void)
+{
     int err;
     wqtree_t* tree;
-    wqtree_palloc(&tree, &wqnmp);
+    wqtree_palloc(&tree, &wqnmp_03);
 
     // we don't want intermediate nodes to be created as not to use too much memory
     wqnode_t *ind, *fnd, *bnd, *cnd, *snd;
@@ -100,7 +143,7 @@ wquery_unittest_03(void)
         wpnerr("%s, %d\n", wquery_strerr(err), err);
         return 1;
     }
-    wmemp_rmnprint(&wqnmp);
+    wmemp_rmnprint(&wqnmp_03);
 
     wqnode_setfn(ind, ndi_fn, tree);
     wqnode_setfn(fnd, ndf_fn, NULL);
@@ -118,8 +161,8 @@ wquery_unittest_03(void)
     wqnode_sets(snd, "hello world!");
 
     wqserver_t* qserver;
-    wqserver_palloc(&qserver, &wqnmp);
-    wmemp_rmnprint(&wqnmp);
+    wqserver_palloc(&qserver, &wqnmp_03);
+    wmemp_rmnprint(&wqnmp_03);
     wqserver_zro(qserver);
     wqserver_expose(qserver, tree);
     wqserver_run(qserver, 4731, 4389);
@@ -140,5 +183,7 @@ int
 main(void)
 {
     wquery_unittest_01();
+    wquery_unittest_02();
+    wquery_unittest_03();
     return 0;
 }
