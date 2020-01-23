@@ -71,15 +71,9 @@ struct wqnode {
 };
 
 static int
-wqnode_malloc(wqnode_t** dst)
+wqnode_walloc(walloc_fn fn, wqnode_t** dst, void* data)
 {
-    return (*dst = malloc(sizeof(struct wqnode))) == NULL;
-}
-
-static int
-wqnode_palloc(wqnode_t** dst, struct wmemp_t* mp)
-{
-    return wmemp_req(mp, sizeof(struct wqnode), (void**)dst);
+    return fn((void*)dst, sizeof(struct wqnode), data);
 }
 
 static int
@@ -338,35 +332,22 @@ wqnode_contents_printj(wqnode_t* nd, char* buf, int len)
     return err;
 }
 
-#define WQTREE_F_MALLOC     1
-#define WQTREE_F_MEMP       2
-
 struct wqtree {
     struct wqnode root;
+    walloc_fn walloc;
     void* ptr;
     int flags;
 };
 
 int
-wqtree_malloc(wqtree_t** dst)
+wqtree_walloc(walloc_fn fn, wqtree_t** dst, void* udt)
 {
-    if ((*dst = malloc(sizeof(struct wqtree)))) {
-        (*dst)->flags |= WQTREE_F_MALLOC;
-        return 0;
+    int err;
+    if (!(err = fn((void**)dst, sizeof(struct wqtree), udt))) {
+        (*dst)->walloc = fn;
+        (*dst)->ptr = udt;
     }
-    return 1;
-}
-
-int
-wqtree_palloc(wqtree_t** dst, struct wmemp_t* mp)
-{
-    int nbytes;
-    if ((nbytes = wmemp_req0(mp, sizeof(struct wqtree),
-                  (void**) dst))) {
-        (*dst)->ptr = mp;
-        (*dst)->flags |= WQTREE_F_MEMP;
-    }
-    return nbytes;
+    return err;
 }
 
 static inline void
@@ -429,7 +410,7 @@ wqtree_addnd(wqtree_t* tree, const char* uri,
     wqnode_t* parent, *nd;
     if (wosc_checkuri(uri))
         return WQUERY_URI_INVALID;
-    if ((err = wqnode_palloc(&nd, tree->ptr)) < 0)
+    if ((err = wqnode_walloc(tree->walloc, &nd, tree->ptr)) < 0)
         return err;
     if ((parent = wqtree_getparent(tree, uri)) == NULL)
         return 43; // TODO: add proper error code: not enough memory space
@@ -471,15 +452,9 @@ wqtree_addnds(wqtree_t* tree, const char* uri,
     int err;
     if ((err = wqtree_addnd(tree, uri, WTYPE_STRING, dst)))
         return err;
-    // todo: distinguish MALLOC from MEMP
-    if (tree->flags & WQTREE_F_MEMP) {
-        if ((err = wmemp_req0(tree->ptr, sizeof(wstr_t)+strlim,
-                   (void**)&((*dst)->value.u.s))) < 0)
-            return err;
-    } else {
-        // malloc not yet implemented
-        return 1;
-    }
+    if ((err = tree->walloc((void**)&((*dst)->value.u.s),
+                     sizeof(wstr_t)+strlim, tree->ptr)))
+        return err;
     (*dst)->value.u.s->cap = strlim;
     return 0;
 }
@@ -581,7 +556,8 @@ wqtree_update_osc(wqtree_t* tree, byte_t* data, int len)
 #define HTTP_NOT_FOUND      404
 #define HTTP_REQ_TIME_OUT   408
 
-#define HTTP_MIME_JSON      "Content-Type: application/json"
+#define HTTP_MIME           "Content-Type: "
+#define HTTP_MIME_JSON      HTTP_MIME "application/json"
 
 #ifndef WPN114_MAXCN
     #define WPN114_MAXCN    1
@@ -608,15 +584,9 @@ struct wqserver {
 };
 
 int
-wqserver_malloc(wqserver_t** dst)
+wqserver_walloc(walloc_fn fn, wqserver_t** dst, void* data)
 {
-    return (*dst = malloc(sizeof(struct wqserver))) == NULL;
-}
-
-int
-wqserver_palloc(wqserver_t** dst, struct wmemp_t* mp)
-{
-    return wmemp_req(mp, sizeof(struct wqserver), (void**)dst);
+    return fn((void**)dst, sizeof(struct wqserver), data);
 }
 
 void
@@ -732,29 +702,36 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
     }
     case MG_EV_HTTP_REQUEST: {
         struct http_message* hm = data;
-        if (hm->query_string.p != NULL) {
-            // we should use a static memory pool here
-            char buf[WPN114_MAXJSON];
-            int err;
-            err = mjson_printf(&mjson_print_fixed_buf, buf,
-                               "{%Q:%s, %Q:%d, %Q:%s, %Q:%s}",
-                  "NAME", "wqserver",
-                  "OSC_PORT", server->uport,
-                  "OSC_TRANSPORT", "UDP",
-                  "EXTENSIONS", s_host_ext);
-            wqserver_reply_json(mgc, buf);
-            break;
-        }
         wqnode_t* target;
         if (hm->uri.len == 1)
-            target = wqtree_getnd(server->tree, "/");
+            target = &server->tree->root;
         else {
-            // todo: better to use dynamic allocation/mempool here
-            char uri[WPN114_MAXPATH];
+            char* uri;
+            int err;
+            if ((err = server->tree->walloc((void**)&uri, WPN114_MAXPATH,
+                       server->tree->ptr))) {
+                wpnerr("could not allocate temporary string storage required"
+                       "for http replying\n");
+                assert(false);
+            }
             memcpy(uri, hm->uri.p, hm->uri.len);
             uri[hm->uri.len] = 0;
+            target = wqtree_getnd(server->tree, uri);
         }
         if (hm->query_string.len) {
+            if (strcmp(hm->query_string.p, "HOST_INFO") == 0) {
+                // we should use a static memory pool here
+                char buf[WPN114_MAXJSON];
+                int err;
+                err = mjson_printf(&mjson_print_fixed_buf, buf,
+                                   "{%Q:%s, %Q:%d, %Q:%s, %Q:%s}",
+                      "NAME", "wqserver",
+                      "OSC_PORT", server->uport,
+                      "OSC_TRANSPORT", "UDP",
+                      "EXTENSIONS", s_host_ext);
+                wqserver_reply_json(mgc, buf);
+                break;
+            }
             // query attribute
             // we don't expect it to be too large, maybe 128 bytes would be enough
             char buf[128];
@@ -859,15 +836,9 @@ struct wqclient {
 };
 
 int
-wqclient_malloc(wqclient_t** dst)
+wqclient_walloc(walloc_fn fn, wqclient_t** dst, void* data)
 {
-    return (*dst = malloc(sizeof(struct wqclient))) == NULL;
-}
-
-int
-wqclient_palloc(wqclient_t** dst, struct wmemp_t* mp)
-{
-    return wmemp_req(mp, sizeof(struct wqclient), (void**) dst);
+    return fn((void**)dst, sizeof(struct wqclient), data);
 }
 
 void

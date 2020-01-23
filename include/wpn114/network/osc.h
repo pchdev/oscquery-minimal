@@ -18,6 +18,10 @@ typedef struct wobdl wobdl_t;
     do { *_ptr = (womsg_t*) alloca(_womsg_sizeof());         \
          memset(*_ptr, 0, _womsg_sizeof()); } while (0)
 
+int
+womsg_alloc(walloc_fn fn, womsg_t** dst, void* udt)
+__nonnull((1));
+
 /* used for alloca */
 int _womsg_sizeof(void);
 int _wobdl_sizeof(void);

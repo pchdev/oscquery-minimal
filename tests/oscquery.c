@@ -55,7 +55,7 @@ wquery_unittest_01(void)
     const char* ndi_name;
     int err, ndi_v;
     wpnout("allocating wqtree..\n");
-    if ((err = wqtree_palloc(&tree, &wqnmp_01)) < 0) {
+    if ((err = wqtree_walloc(WPN_MEMP, &tree, &wqnmp_01)) < 0) {
         return err;
     }
     wmemp_rmnprint(&wqnmp_01);
@@ -85,7 +85,7 @@ wquery_unittest_02(void)
     wqnode_t* nds;
     const char* nds_v;
     int err;
-    wqtree_palloc(&tree, &wqnmp_02);
+    wqtree_walloc(WPN_MEMP, &tree, &wqnmp_02);
     wmemp_rmnprint(&wqnmp_02);
     if ((err = wqtree_addnds(tree, "/foo/bar/string", &nds, 64))) {
         return err;
@@ -107,12 +107,12 @@ wquery_unittest_03(void)
     wqtree_t* tree;
     wqnode_t* ndf;
     int err;
-    if ((err = wqserver_palloc(&server, &wqnmp_03)) < 0) {
-        wpnerr("could not palloc server\n");
+    if ((err = wqserver_walloc(WPN_MEMP, &server, &wqnmp_03)) < 0) {
+        wpnerr("could not allocate server\n");
         assert(false);
     }
     wqserver_zro(server);
-    wqtree_palloc(&tree, &wqnmp_03);
+    wqtree_walloc(WPN_MEMP, &tree, &wqnmp_03);
     wqtree_addndf(tree, "/float", &ndf);
     wqnode_setf(ndf, 27.31);
     wqserver_expose(server, tree);
@@ -131,7 +131,7 @@ wquery_unittest_04(void)
 {
     int err;
     wqtree_t* tree;
-    wqtree_palloc(&tree, &wqnmp_03);
+    wqtree_walloc(WPN_MEMP, &tree, &wqnmp_03);
 
     // we don't want intermediate nodes to be created as not to use too much memory
     wqnode_t *ind, *fnd, *bnd, *cnd, *snd;
@@ -161,7 +161,7 @@ wquery_unittest_04(void)
     wqnode_sets(snd, "hello world!");
 
     wqserver_t* qserver;
-    wqserver_palloc(&qserver, &wqnmp_03);
+    wqserver_walloc(WPN_MEMP, &qserver, &wqnmp_03);
     wmemp_rmnprint(&wqnmp_03);
     wqserver_zro(qserver);
     wqserver_expose(qserver, tree);

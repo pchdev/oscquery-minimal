@@ -13,6 +13,12 @@ struct womsg {
 
 int _womsg_sizeof(void) { return sizeof(struct womsg); }
 
+int
+womsg_alloc(walloc_fn fn, womsg_t** dst, void* udt)
+{
+    return fn((void**)dst, sizeof(struct womsg), udt);
+}
+
 enum wtype_t
 wosc_tag2tp(char tag)
 {

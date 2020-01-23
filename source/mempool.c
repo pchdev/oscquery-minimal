@@ -1,6 +1,21 @@
 #include <wpn114/mempool.h>
 #include <wpn114/utilities.h>
 
+
+int
+walloc_dynamic(void** dst, size_t nbytes, void* udt)
+{
+    (void) udt;
+    return (*dst = malloc(nbytes)) == NULL;
+}
+
+int
+walloc_memp(void** dst, size_t nbytes, void* udt)
+{
+    struct wmemp_t* mp = udt;
+    return wmemp_req(mp, nbytes, dst);
+}
+
 /* Upfront check if <nbytes> can be allocated from <mp>.
  * Returns remaining free space (negative if there's
  * not enough space */

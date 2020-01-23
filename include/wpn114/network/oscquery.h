@@ -102,12 +102,8 @@ extern int wqnode_gets(wqnode_t* node, const char** s) __nonnull((1, 2));;
 typedef struct wqtree wqtree_t;
 
 extern int
-wqtree_malloc(wqtree_t** dst)
+wqtree_walloc(walloc_fn fn, wqtree_t** dst, void* udt)
 __nonnull((1));
-
-extern int
-wqtree_palloc(wqtree_t** dst, struct wmemp_t* mp)
-__nonnull((1, 2));
 
 extern int
 wqtree_setfl(wqtree_t* tree, enum wqflags_t flags)
@@ -133,11 +129,7 @@ __nonnull((1, 2));
 typedef struct wqserver wqserver_t;
 
 extern int
-wqserver_malloc(wqserver_t** dst)
-__nonnull((1));
-
-extern int
-wqserver_palloc(wqserver_t** dst, struct wmemp_t* mp)
+wqserver_walloc(walloc_fn fn, wqserver_t** dst, void* data)
 __nonnull((1, 2));
 
 extern void
@@ -163,11 +155,7 @@ __nonnull((1));
 typedef struct wqclient wqclient_t;
 
 extern int
-wqclient_malloc(wqclient_t** dst)
-__nonnull((1));
-
-extern int
-wqclient_palloc(wqclient_t** dst, struct wmemp_t* mp)
+wqclient_walloc(walloc_fn fn, wqclient_t** dst, void* data)
 __nonnull((1, 2));
 
 extern void

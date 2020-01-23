@@ -4,6 +4,21 @@
 #include <stdlib.h>
 #include <stdint.h>
 
+typedef int (*walloc_fn) (
+    void**,     // dst-ptr
+    size_t,     // size
+    void*       // ptr
+);
+
+int
+walloc_dynamic(void** dst, size_t nbytes, void*);
+
+int
+walloc_memp(void** dst, size_t nbytes, void* memp);
+
+#define WPN_MALLOC walloc_dynamic
+#define WPN_MEMP walloc_memp
+
 /** Simple memory pool, pointing to a raw byte array.
  * Struct is not presented as an opaque type pointer, for convenience.
  * Do not directly set struct fields, use the proper functions/macros. */
