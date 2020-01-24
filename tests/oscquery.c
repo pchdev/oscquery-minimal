@@ -47,6 +47,8 @@ nds_fn(wqnode_t* nd, wvalue_t* v, void* udt)
 wpn_declstatic_alloc_mp(wqmp_01, 256);
 
 // simple int node test
+
+
 int
 wquery_unittest_01(void)
 {

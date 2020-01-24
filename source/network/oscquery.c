@@ -794,10 +794,10 @@ wqserver_run(wqserver_t* server, uint16_t udpport, uint16_t wsport)
         return WQUERY_BINDERR_TCP;
     }
     mg_set_protocol_http_websocket(c_tcp);
-//    if ((c_udp = mg_bind(&server->mgr, udp_hdr,
-//                 wqserver_udp_hdl)) == NULL) {
-//        return WQUERY_BINDERR_UDP;
-//    }
+    if ((c_udp = mg_bind(&server->mgr, udp_hdr,
+                 wqserver_udp_hdl)) == NULL) {
+        return WQUERY_BINDERR_UDP;
+    }
     server->running = true;
 #ifdef WPN114_MULTITHREAD
     pthread_create(&server->thread, 0, wqserver_pthread_run, server);

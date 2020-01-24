@@ -45,12 +45,12 @@ struct wmemp_t {
 };
 /* Convenience macro, declares a static memory pool without the need
  * to set the actual byte array manually */
-#define wpn_declstatic_mp(_nm, _sz)                    \
-    static uint8_t _nm##_u8a[_sz];                     \
+#define wpn_declstatic_mp(_nm, _sz)                     \
+    static uint8_t _nm##_u8a[_sz];                      \
     static struct wmemp_t _nm = { 0, _sz, _nm##_u8a }
 
-#define wpn_declstatic_alloc_mp(_nm, _sz) \
-    wpn_declstatic_mp(_nm##_mp, _sz); \
+#define wpn_declstatic_alloc_mp(_nm, _sz)               \
+    wpn_declstatic_mp(_nm##_mp, _sz);                   \
     static struct walloc_t _nm = { walloc_memp, wfree_memp, &_nm##_mp };
 
 /** Upfront check if <nbytes> can be allocated from <mp>.

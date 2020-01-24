@@ -20,6 +20,7 @@ int
 wfree_dynamic(void** dst, size_t nbytes, void* data)
 {
     (void) data;
+    (void) nbytes;
     free(*dst);
     return 0;
 }
