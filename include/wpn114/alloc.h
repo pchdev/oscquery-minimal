@@ -1,5 +1,5 @@
-#ifndef WPN_MEMPOOL_H
-#define WPN_MEMPOOL_H
+#ifndef WPN_ALLOC_H
+#define WPN_ALLOC_H
 
 #include <stdlib.h>
 #include <stdint.h>
@@ -10,11 +10,27 @@ typedef int (*walloc_fn) (
     void*       // ptr
 );
 
-int
-walloc_dynamic(void** dst, size_t nbytes, void*);
+struct walloc_t {
+    walloc_fn alloc;
+    walloc_fn free;
+    void* data;
+};
 
 int
-walloc_memp(void** dst, size_t nbytes, void* memp);
+walloc_dynamic(void** dst, size_t nbytes, void*)
+__nonnull((1));
+
+int
+walloc_memp(void** dst, size_t nbytes, void* memp)
+__nonnull((1, 3));
+
+int
+wfree_dynamic(void** dst, size_t nbytes, void*)
+__nonnull((1));
+
+int
+wfree_memp(void** dst, size_t nbytes, void* memp)
+__nonnull((1, 3));
 
 #define WPN_MALLOC walloc_dynamic
 #define WPN_MEMP walloc_memp
@@ -32,6 +48,10 @@ struct wmemp_t {
 #define wpn_declstatic_mp(_nm, _sz)                    \
     static uint8_t _nm##_u8a[_sz];                     \
     static struct wmemp_t _nm = { 0, _sz, _nm##_u8a }
+
+#define wpn_declstatic_alloc_mp(_nm, _sz) \
+    wpn_declstatic_mp(_nm##_mp, _sz); \
+    static struct walloc_t _nm = { walloc_memp, wfree_memp, &_nm##_mp };
 
 /** Upfront check if <nbytes> can be allocated from <mp>.
  * Returns remaining free space (negative if there's

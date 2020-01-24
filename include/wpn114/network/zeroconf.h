@@ -1,7 +1,7 @@
 #ifndef WPN_ZEROCONF_H
 #define WPN_ZEROCONF_H
 
-#include <wpn114/mempool.h>
+#include <wpn114/alloc.h>
 
 #ifdef __cplusplus
 extern "C" {

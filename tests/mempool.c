@@ -1,4 +1,4 @@
-#include <wpn114/mempool.h>
+#include <wpn114/alloc.h>
 #include <wpn114/utilities.h>
 #include <assert.h>
 
@@ -30,17 +30,20 @@ wpn_mp_unittest_01(void)
     wpnout("wpn_mp_unittest_01_d_ok\n");
 }
 
+wpn_declstatic_alloc_mp(walloc_02, 256);
+
 void
 wpn_mp_unittest_02(void)
 {
-    long err;
-    int *ptr1, *ptr2;
+    assert(walloc_02.data == &walloc_02_mp);
+    assert(walloc_02.alloc == WPN_MEMP);
+    assert(walloc_02.free == wfree_memp);
 }
 
 int
 main(void)
 {
     wpn_mp_unittest_01();
-//    wpn_mp_unittest_02();
+    wpn_mp_unittest_02();
     return 0;
 }

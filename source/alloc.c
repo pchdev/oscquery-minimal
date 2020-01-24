@@ -1,19 +1,37 @@
-#include <wpn114/mempool.h>
+#include <wpn114/alloc.h>
 #include <wpn114/utilities.h>
 
 
 int
-walloc_dynamic(void** dst, size_t nbytes, void* udt)
+walloc_dynamic(void** dst, size_t nbytes, void* data)
 {
-    (void) udt;
+    (void) data;
     return (*dst = malloc(nbytes)) == NULL;
 }
 
 int
-walloc_memp(void** dst, size_t nbytes, void* udt)
+walloc_memp(void** dst, size_t nbytes, void* data)
 {
-    struct wmemp_t* mp = udt;
+    struct wmemp_t* mp = data;
     return wmemp_req(mp, nbytes, dst);
+}
+
+int
+wfree_dynamic(void** dst, size_t nbytes, void* data)
+{
+    (void) data;
+    free(*dst);
+    return 0;
+}
+
+int
+wfree_memp(void** dst, size_t nbytes, void* data)
+{
+    int err;
+    struct wmemp_t* mp = data;
+    if (!(err = wmemp_free(mp, *dst, nbytes)))
+        *dst = NULL;
+    return err;
 }
 
 /* Upfront check if <nbytes> can be allocated from <mp>.

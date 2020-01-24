@@ -3,7 +3,6 @@
 
 #include <pthread.h>
 #include <wpn114/network/osc.h>
-#include <wpn114/mempool.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -102,7 +101,7 @@ extern int wqnode_gets(wqnode_t* node, const char** s) __nonnull((1, 2));;
 typedef struct wqtree wqtree_t;
 
 extern int
-wqtree_walloc(walloc_fn fn, wqtree_t** dst, void* udt)
+wqtree_walloc(struct walloc_t* allocator, wqtree_t** dst)
 __nonnull((1));
 
 extern int
@@ -129,7 +128,7 @@ __nonnull((1, 2));
 typedef struct wqserver wqserver_t;
 
 extern int
-wqserver_walloc(walloc_fn fn, wqserver_t** dst, void* data)
+wqserver_walloc(struct walloc_t* alloc, wqserver_t** dst)
 __nonnull((1, 2));
 
 extern void
@@ -155,7 +154,7 @@ __nonnull((1));
 typedef struct wqclient wqclient_t;
 
 extern int
-wqclient_walloc(walloc_fn fn, wqclient_t** dst, void* data)
+wqclient_walloc(struct walloc_t* alloc, wqclient_t** dst)
 __nonnull((1, 2));
 
 extern void

@@ -33,23 +33,14 @@ wquery_strerr(int err)
 }
 
 int
-wstr_malloc(uint16_t cap, wstr_t** dst)
-{
-    if (((*dst) = malloc(sizeof(wstr_t)+ cap))) {
-        memset(*dst, 0, sizeof(wstr_t) + cap);
-        (*dst)->cap = cap;
-        return 0;
-    }
-    return 1;
-}
-
-int
-wstr_palloc(struct wmemp_t* mp, uint16_t cap, wstr_t** dst)
+wstr_walloc(struct walloc_t* _allocator, wstr_t** dst, uint16_t strlim)
 {
     int err;
-    if ((err = wmemp_req0(mp, sizeof(wstr_t)+cap,
-               (void**) dst)) >= 0) {
-        (*dst)->cap = cap;
+    if (!(err = _allocator->alloc((void**)dst,
+                sizeof(wstr_t)+strlim,
+                _allocator->data))) {
+        memset(*dst, 0, sizeof(wstr_t)+strlim);
+        (*dst)->cap = strlim;
     }
     return err;
 }
@@ -70,10 +61,12 @@ struct wqnode {
     int status;
 };
 
-static int
-wqnode_walloc(walloc_fn fn, wqnode_t** dst, void* data)
+static inline int
+wqnode_walloc(struct walloc_t* _allocator, wqnode_t** dst)
 {
-    return fn((void*)dst, sizeof(struct wqnode), data);
+    return _allocator->alloc((void**)dst,
+                       sizeof(struct wqnode),
+                       _allocator->data);
 }
 
 static int
@@ -334,18 +327,18 @@ wqnode_contents_printj(wqnode_t* nd, char* buf, int len)
 
 struct wqtree {
     struct wqnode root;
-    walloc_fn walloc;
-    void* ptr;
+    struct walloc_t* alloc;
     int flags;
 };
 
 int
-wqtree_walloc(walloc_fn fn, wqtree_t** dst, void* udt)
+wqtree_walloc(struct walloc_t* _allocator, wqtree_t** _dst)
 {
     int err;
-    if (!(err = fn((void**)dst, sizeof(struct wqtree), udt))) {
-        (*dst)->walloc = fn;
-        (*dst)->ptr = udt;
+    if (!(err = _allocator->alloc((void**)_dst,
+                sizeof(struct wqtree),
+                _allocator->data))) {
+        (*_dst)->alloc = _allocator;
     }
     return err;
 }
@@ -392,13 +385,16 @@ wqtree_getparent(wqtree_t* tree, const char* uri)
     // if /foo exists, set target to /foo and look for /foo/bar
     // if /foo doesn't exist, set it to root
     // we have to allocate a string here, of the same size as uri
-    if ((err = wstr_palloc(tree->ptr, len, &str)) < 0)
+    if ((err = wstr_walloc(tree->alloc->alloc, len, &str))) {
+        wpnerr("could not allocate temporary string storage, aborting...\n");
         return NULL;
+    }
     while ((child = wqnode_getchd(target, str->dat))) {
            _uricatnext(uri, str->dat);
            target = child;
-    }
-    wmemp_free(tree->ptr, str, sizeof(wstr_t)+str->cap);
+    }    
+    tree->alloc->free((void**)str, sizeof(wstr_t)+str->cap,
+                      tree->alloc->data);
     return target;
 }
 
@@ -410,7 +406,7 @@ wqtree_addnd(wqtree_t* tree, const char* uri,
     wqnode_t* parent, *nd;
     if (wosc_checkuri(uri))
         return WQUERY_URI_INVALID;
-    if ((err = wqnode_walloc(tree->walloc, &nd, tree->ptr)) < 0)
+    if ((err = wqnode_walloc(tree->alloc, &nd)) < 0)
         return err;
     if ((parent = wqtree_getparent(tree, uri)) == NULL)
         return 43; // TODO: add proper error code: not enough memory space
@@ -450,13 +446,12 @@ wqtree_addnds(wqtree_t* tree, const char* uri,
               wqnode_t** dst, int strlim)
 {
     int err;
+    wstr_t* str;
     if ((err = wqtree_addnd(tree, uri, WTYPE_STRING, dst)))
-        return err;
-    if ((err = tree->walloc((void**)&((*dst)->value.u.s),
-                     sizeof(wstr_t)+strlim, tree->ptr)))
-        return err;
-    (*dst)->value.u.s->cap = strlim;
-    return 0;
+        return err;    
+    if (!(err = wstr_walloc(tree->alloc, &str, strlim)))
+        (*dst)->value.u.s->cap = strlim;
+    return err;
 }
 
 static wqnode_t*
@@ -584,9 +579,11 @@ struct wqserver {
 };
 
 int
-wqserver_walloc(walloc_fn fn, wqserver_t** dst, void* data)
+wqserver_walloc(struct walloc_t* _allocator, wqserver_t** dst)
 {
-    return fn((void**)dst, sizeof(struct wqserver), data);
+    return _allocator->alloc((void**)dst,
+           sizeof(struct wqserver),
+           _allocator->data);
 }
 
 void
@@ -708,8 +705,9 @@ wqserver_tcp_hdl(struct mg_connection* mgc, int event, void* data)
         else {
             char* uri;
             int err;
-            if ((err = server->tree->walloc((void**)&uri, WPN114_MAXPATH,
-                       server->tree->ptr))) {
+            if ((err = server->tree->alloc->alloc((void**)&uri,
+                       WPN114_MAXPATH,
+                       server->tree->alloc->data))) {
                 wpnerr("could not allocate temporary string storage required"
                        "for http replying\n");
                 assert(false);
@@ -836,9 +834,11 @@ struct wqclient {
 };
 
 int
-wqclient_walloc(walloc_fn fn, wqclient_t** dst, void* data)
+wqclient_walloc(struct walloc_t* _allocator, wqclient_t** dst)
 {
-    return fn((void**)dst, sizeof(struct wqclient), data);
+    return _allocator->alloc((void**)dst,
+            sizeof(struct wqclient),
+            _allocator->data);
 }
 
 void

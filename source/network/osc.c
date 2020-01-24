@@ -14,9 +14,11 @@ struct womsg {
 int _womsg_sizeof(void) { return sizeof(struct womsg); }
 
 int
-womsg_alloc(walloc_fn fn, womsg_t** dst, void* udt)
+womsg_walloc(struct walloc_t* _allocator, womsg_t** _dst)
 {
-    return fn((void**)dst, sizeof(struct womsg), udt);
+    return _allocator->alloc((void**)_dst,
+           sizeof(struct womsg),
+           _allocator->data);
 }
 
 enum wtype_t
