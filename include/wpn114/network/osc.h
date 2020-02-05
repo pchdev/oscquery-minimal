@@ -79,7 +79,7 @@ __nonnull((1));
 
 /** Returns message's total number of arguments */
 int
-womsg_getcnt(womsg_t* msg)
+womsg_getargc(womsg_t* msg)
 __nonnull((1));
 
 /* Returns message's argument tagline */

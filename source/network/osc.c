@@ -195,7 +195,7 @@ womsg_getlen(struct womsg* msg)
 }
 
 int
-womsg_getcnt(struct womsg* msg)
+womsg_getargc(struct womsg* msg)
 {
     return strlen(_tagnc(msg));
 }
@@ -215,7 +215,7 @@ womsg_checkw(struct womsg* msg, char tag, byte_t tpsz)
         return WOMSG_READ_ONLY;
     if (msg->mode == WOMSG_WTAGLOCKED) {
         // if tag is locked and there's no next tag, return error
-        if (msg->idx >= womsg_getcnt(msg))
+        if (msg->idx >= womsg_getargc(msg))
             return WOMSG_TAG_END;
         // check if <value> type matches next tag in line
         else if (_nexttag(msg) != tag)
@@ -249,7 +249,7 @@ womsg_write(struct womsg* msg, void* value, size_t sz)
             // resetting tag and r/w indexes.
             msg->mode = WOMSG_R;
             msg->idx = 0;
-            len = womsg_getcnt(msg)+1;
+            len = womsg_getargc(msg)+1;
             len += womsg_npads(len);
             msg->rwi = (byte_t*)(&(msg->buf[msg->tag])+len);
         }

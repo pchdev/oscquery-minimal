@@ -11,43 +11,38 @@ set(WPN_TESTS_DIR ${CMAKE_CURRENT_SOURCE_DIR}/tests)
 set(WPN_DEPENDENCIES_DIR ${CMAKE_CURRENT_SOURCE_DIR}/dependencies)
 set(CMAKE_INCLUDE_CURRENT_DIR TRUE)
 
-option(WPN_TESTS "enables unit-testing for this module" ON)
+# HEADERS/SOURCES ---------------------------------------------------------------------------------
 
 set(PROJECT_HEADER_FILES
     ${WPN_HEADERS_DIR}/wpn114.h
     ${WPN_HEADERS_DIR}/utilities.h
     ${WPN_HEADERS_DIR}/types.h
-    ${WPN_HEADERS_DIR}/alloc.h)
-
-set(PROJECT_SOURCE_FILES
-    ${WPN_SOURCES_DIR}/alloc.c)
-
-# OPTIONS -----------------------------------------------------------------------------------------
-
-option(WPN_MULTITHREAD "enables/disables multithread processing" ON)
-
-# HEADERS/SOURCES ---------------------------------------------------------------------------------
-
-set(PROJECT_HEADER_FILES ${PROJECT_HEADER_FILES}
+    ${WPN_HEADERS_DIR}/alloc.h
     ${WPN_HEADERS_DIR}/network/osc.h
     ${WPN_HEADERS_DIR}/network/oscquery.h
     ${WPN_HEADERS_DIR}/network/zeroconf.h
     ${WPN_DEPENDENCIES_DIR}/mongoose/mongoose.h
     ${WPN_DEPENDENCIES_DIR}/mjson/mjson.h)
-set(PROJECT_SOURCE_FILES ${PROJECT_SOURCE_FILES}
+
+set(PROJECT_SOURCE_FILES
+    ${WPN_SOURCES_DIR}/alloc.c
     ${WPN_SOURCES_DIR}/network/osc.c
     ${WPN_SOURCES_DIR}/network/oscquery.c
     ${WPN_SOURCES_DIR}/network/zeroconf.c
     ${WPN_DEPENDENCIES_DIR}/mongoose/mongoose.c)
 
+# OPTIONS -----------------------------------------------------------------------------------------
+include(ProcessorCount)
+ProcessorCount(WPN114_NPROC)
+option(WPN_MULTITHREAD "enables/disables multithread processing" ON)
+option(WPN_TESTS "enables unit-testing for this module" ON)
+
 if (WPN_TESTS)
+    include(CTest)
     add_subdirectory(tests)
 endif()
 
 # PROJECT -----------------------------------------------------------------------------------------
-
-include(ProcessorCount)
-ProcessorCount(WPN114_NPROC)
 
 add_library(${PROJECT_NAME} ${PROJECT_SOURCE_FILES} ${PROJECT_HEADER_FILES})
 target_include_directories(${PROJECT_NAME} PUBLIC ${WPN_INCLUDE_DIR})

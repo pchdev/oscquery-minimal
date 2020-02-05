@@ -24,6 +24,9 @@ extern "C" {
               _tname, _testno);                                 \
     } _testno++                                                 \
 
+#define wtest_fassert_soft(_test, ...)                          \
+    wtest_assert_soft(!(_test), ##__VA_ARGS__)
+
 #define wtest_end                                                   \
     wpnout("wpn_unittest_%s ended, passed %d/%d tests (%.1f\%)\n",  \
            _tname, _testno-_nerr, _testno,                          \
