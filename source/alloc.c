@@ -3,35 +3,34 @@
 
 
 int
-walloc_dynamic(void** dst, size_t nbytes, void* data)
+walloc_dynamic(void* dst, size_t nbytes,
+               WPN_UNUSED void* data)
 {
-    (void) data;
-    return (*dst = malloc(nbytes)) == NULL;
+    return (dst = malloc(nbytes)) == NULL;
 }
 
 int
-walloc_memp(void** dst, size_t nbytes, void* data)
+walloc_memp(void* dst, size_t nbytes, void* data)
 {
     struct wmemp_t* mp = data;
     return wmemp_req(mp, nbytes, dst);
 }
 
 int
-wfree_dynamic(void** dst, size_t nbytes, void* data)
+wfree_dynamic(void* dst, WPN_UNUSED size_t nbytes,
+              WPN_UNUSED void* data)
 {
-    (void) data;
-    (void) nbytes;
-    free(*dst);
+    free(dst);
     return 0;
 }
 
 int
-wfree_memp(void** dst, size_t nbytes, void* data)
+wfree_memp(void* dst, size_t nbytes, void* data)
 {
     int err;
     struct wmemp_t* mp = data;
-    if (!(err = wmemp_free(mp, *dst, nbytes)))
-        *dst = NULL;
+    if (!(err = wmemp_free(mp, dst, nbytes)))
+        dst = NULL;
     return err;
 }
 
@@ -50,23 +49,23 @@ wmemp_chk(struct wmemp_t* mp, size_t nbytes)
    negative if capacity is exceeded, in which case, allocation
    does not occur.*/
 int
-wmemp_req(struct wmemp_t* mp, size_t nbytes, void** ptr)
+wmemp_req(struct wmemp_t* mp, size_t nbytes, void* ptr)
 {
     size_t nsz = mp->usd+nbytes;
     if (nsz <= mp->cap) {
-       *ptr = &mp->dat[mp->usd];
-        mp->usd += nbytes;
+       ptr = &mp->dat[mp->usd];
+       mp->usd += nbytes;
     }
     return (int)(mp->cap-nsz);
 }
 
 /* Same as wpn_mpreq, excepts it memsets allocated space to 0 */
 int
-wmemp_req0(struct wmemp_t* mp, size_t nbytes, void** ptr)
+wmemp_req0(struct wmemp_t* mp, size_t nbytes, void* ptr)
 {
     int ret = wmemp_req(mp, nbytes, ptr);
     if (ret >= 0)
-        memset(*ptr, 0, nbytes);
+        memset(ptr, 0, nbytes);
     return ret;
 }
 

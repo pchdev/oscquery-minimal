@@ -3,6 +3,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <assert.h>
+#include "tests.h"
 
 static sig_atomic_t
 s_sig = 0;
@@ -48,84 +49,64 @@ wpn_declstatic_alloc_mp(wqmp_01, 256);
 
 // simple int node test
 
-
-int
-wquery_unittest_01(void)
+wtest(query_01)
 {
+    wtest_begin(query_01);
     wqtree_t* tree;
     wqnode_t* ndi;
-    const char* ndi_name;
-    int err, ndi_v;
-    wpnout("allocating wqtree..\n");
-    if ((err = wqtree_walloc(&wqmp_01, &tree)) < 0) {
-        return err;
-    }
-    wmemp_rmnprint(wqmp_01.data);
-    wpnout("allocating wqnode..\n");
-    if ((err = wqtree_addndi(tree, "/foo/bar/int", &ndi))) {
-        return err;
-    }
-    wmemp_rmnprint(wqmp_01.data);
-    ndi_name = wqnode_getname(ndi);
-    assert(strcmp(ndi_name, "int") == 0);
-    assert(wqnode_getaccess(ndi) == WQNODE_ACCESS_RW);
-    assert(wqnode_geti(ndi, &ndi_v) == 0);
-    assert(ndi_v == 0);
-    assert(wqnode_seti(ndi, 47) == 0);
+    int ndi_v;
+    wqtree_t** ptr = &tree;
+
+    wtest_fassert_soft(wqtree_walloc(&wqmp_01, ptr));
+    wtest_fassert_soft(wqtree_addndi(tree, "/foo/bar/int", &ndi));
+    wtest_fassert_soft(strcmp(wqnode_getname(ndi), "int"));
+    wtest_assert_soft(wqnode_getaccess(ndi) == WQNODE_ACCESS_RW);
+    wtest_fassert_soft(wqnode_geti(ndi, &ndi_v));
+    wtest_fassert_soft(ndi_v);
+    wtest_fassert_soft(wqnode_seti(ndi, 47));
     wqnode_geti(ndi, &ndi_v);
-    assert(ndi_v == 47);
-    return err;
+    wtest_assert_soft(ndi_v == 47);
+    wtest_end;
 }
 
-// test with string node, todo
+// test with string node
 wpn_declstatic_alloc_mp(wqmp_02, 256);
 
-int
-wquery_unittest_02(void)
+wtest(query_02)
 {
+    wtest_begin(query_02);
     wqtree_t* tree;
     wqnode_t* nds;
     const char* nds_v;
-    int err;
-    wqtree_walloc(&wqmp_02, &tree);
-    wmemp_rmnprint(wqmp_02.data);
-    if ((err = wqtree_addnds(tree, "/foo/bar/string", &nds, 64))) {
-        return err;
-    }
-    wmemp_rmnprint(wqmp_02.data);
-    wqnode_sets(nds, "owls are not what they seem");
-    wqnode_gets(nds, &nds_v);
-    assert(strcmp(nds_v, "owls are not what they seem") == 0);
-    wpnout("string is: %s\n", nds_v);
-    return 0;
+    wtest_fassert_soft(wqtree_walloc(&wqmp_02, &tree));
+    wtest_fassert_soft(wqtree_addnds(tree, "/foo/bar/string", &nds, 64));
+    wtest_fassert_soft(wqnode_sets(nds, "owls are not what they seem"));
+    wtest_fassert_soft(wqnode_gets(nds, &nds_v));
+    wtest_fassert_soft(strcmp(nds_v, "owls are not what they seem"));
+    wtest_end;
 }
 
 wpn_declstatic_alloc_mp(wqmp_03, 512);
-
-int
-wquery_unittest_03(void)
+wtest(query_03)
 {
+    wtest_begin(query_03);
     wqserver_t* server;
     wqtree_t* tree;
     wqnode_t* ndf;
-    int err;
-    if ((err = wqserver_walloc(&wqmp_03, &server)) < 0) {
-        wpnerr("could not allocate server\n");
-        assert(false);
-    }
+    wtest_fassert_soft(wqserver_walloc(&wqmp_03, &server));
     wqserver_zro(server);
-    wqtree_walloc(&wqmp_03, &tree);
-    wqtree_addndf(tree, "/float", &ndf);
-    wqnode_setf(ndf, 27.31);
-    wqserver_expose(server, tree);
+    wtest_fassert_soft(wqtree_walloc(&wqmp_03, &tree));
+    wtest_fassert_soft(wqtree_addndf(tree, "/float", &ndf));
     wqnode_setfn(ndf, ndf_fn, NULL);
-    if ((err = wqserver_run(server, 1234, 5678))) {
-        wpnerr("%s (%d)\n", wquery_strerr(err), err);
-    }
+    wtest_fassert_soft(wqnode_setf(ndf, 27.31));
+    wqserver_expose(server, tree);
+    wtest_fassert_soft(wqserver_run(server, 1234, 5678));
     wpnout("running oscquery server on port 5678\n");
     while (s_sig == 0)
-        sleep(10);
-    return 0;
+        sleep(1);
+
+    wtest_end;
+
 }
 
 int
@@ -184,8 +165,9 @@ wquery_unittest_04(void)
 int
 main(void)
 {
-    wquery_unittest_01();
-    wquery_unittest_02();
-    wquery_unittest_03();
-    return 0;
+    int err = 0;
+    err += wpn_unittest_query_01();
+    err += wpn_unittest_query_02();
+    err += wpn_unittest_query_03();
+    return err;
 }

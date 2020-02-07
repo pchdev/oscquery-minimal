@@ -31,4 +31,11 @@
 #else
     #define _wpn_attr_packed
 #endif
+
+#ifdef __GNUC__
+    #define WPN_UNUSED __attribute__ ((unused))
+#else
+    #define WPN_UNUSED
+#endif
+
 #endif

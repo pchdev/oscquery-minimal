@@ -335,9 +335,9 @@ int
 wqtree_walloc(struct walloc_t* _allocator, wqtree_t** _dst)
 {
     int err;
-    if (!(err = _allocator->alloc((void**)_dst,
-                sizeof(struct wqtree),
-                _allocator->data))) {
+    if ((err = _allocator->alloc(_dst, sizeof(struct wqtree),
+               _allocator->data)) >= 0) {
+        err = 0;
         (*_dst)->alloc = _allocator;
     }
     return err;
