@@ -36,9 +36,9 @@ int
 wstr_walloc(struct walloc_t* _allocator, wstr_t** dst, uint16_t strlim)
 {
     int err;
-    if (!(err = _allocator->alloc((void**)dst,
+    if ((err = _allocator->alloc(dst,
                 sizeof(wstr_t)+strlim,
-                _allocator->data))) {
+                _allocator->data)) >= 0) {
         memset(*dst, 0, sizeof(wstr_t)+strlim);
         (*dst)->cap = strlim;
     }
@@ -337,8 +337,8 @@ wqtree_walloc(struct walloc_t* _allocator, wqtree_t** _dst)
     int err;
     if ((err = _allocator->alloc(_dst, sizeof(struct wqtree),
                _allocator->data)) >= 0) {
-        err = 0;
         (*_dst)->alloc = _allocator;
+        err = 0;
     }
     return err;
 }
@@ -385,7 +385,7 @@ wqtree_getparent(wqtree_t* tree, const char* uri)
     // if /foo exists, set target to /foo and look for /foo/bar
     // if /foo doesn't exist, set it to root
     // we have to allocate a string here, of the same size as uri
-    if ((err = wstr_walloc(tree->alloc->alloc, len, &str))) {
+    if ((err = wstr_walloc(tree->alloc, &str, len)) < 0) {
         wpnerr("could not allocate temporary string storage, aborting...\n");
         return NULL;
     }
@@ -406,10 +406,14 @@ wqtree_addnd(wqtree_t* tree, const char* uri,
     wqnode_t* parent, *nd;
     if (wosc_checkuri(uri))
         return WQUERY_URI_INVALID;
-    if ((err = wqnode_walloc(tree->alloc, &nd)) < 0)
+    if ((err = wqnode_walloc(tree->alloc, &nd)) < 0) {
+        wpnerr("walloc failed");
         return err;
-    if ((parent = wqtree_getparent(tree, uri)) == NULL)
+    }
+    if ((parent = wqtree_getparent(tree, uri)) == NULL) {
+        wpnerr("getparent failed");
         return 43; // TODO: add proper error code: not enough memory space
+    }
     nd->value.t = type;
     wqnode_seturi(nd, uri);
     wqnode_addchd(parent, nd);
@@ -449,8 +453,11 @@ wqtree_addnds(wqtree_t* tree, const char* uri,
     wstr_t* str;
     if ((err = wqtree_addnd(tree, uri, 's', dst)))
         return err;    
-    if (!(err = wstr_walloc(tree->alloc, &str, strlim)))
-        (*dst)->value.u.s->cap = strlim;
+    if ((err = wstr_walloc(tree->alloc, &str, strlim)) >= 0) {
+        str->cap = strlim;
+        (*dst)->value.u.s = str;
+        err = 0;
+    }
     return err;
 }
 

@@ -55,9 +55,7 @@ wtest(query_01)
     wqtree_t* tree;
     wqnode_t* ndi;
     int ndi_v;
-    wqtree_t** ptr = &tree;
-
-    wtest_fassert_soft(wqtree_walloc(&wqmp_01, ptr));
+    wtest_fassert_soft(wqtree_walloc(&wqmp_01, &tree));
     wtest_fassert_soft(wqtree_addndi(tree, "/foo/bar/int", &ndi));
     wtest_fassert_soft(strcmp(wqnode_getname(ndi), "int"));
     wtest_assert_soft(wqnode_getaccess(ndi) == WQNODE_ACCESS_RW);

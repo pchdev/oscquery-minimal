@@ -49,11 +49,11 @@ wmemp_chk(struct wmemp_t* mp, size_t nbytes)
    negative if capacity is exceeded, in which case, allocation
    does not occur.*/
 int
-wmemp_req(struct wmemp_t* mp, size_t nbytes, void* ptr)
+wmemp_req(struct wmemp_t* mp, size_t nbytes, void** ptr)
 {
     size_t nsz = mp->usd+nbytes;
     if (nsz <= mp->cap) {
-       ptr = &mp->dat[mp->usd];
+       *ptr = &mp->dat[mp->usd];
        mp->usd += nbytes;
     }
     return (int)(mp->cap-nsz);
@@ -61,11 +61,11 @@ wmemp_req(struct wmemp_t* mp, size_t nbytes, void* ptr)
 
 /* Same as wpn_mpreq, excepts it memsets allocated space to 0 */
 int
-wmemp_req0(struct wmemp_t* mp, size_t nbytes, void* ptr)
+wmemp_req0(struct wmemp_t* mp, size_t nbytes, void** ptr)
 {
     int ret = wmemp_req(mp, nbytes, ptr);
     if (ret >= 0)
-        memset(ptr, 0, nbytes);
+        memset(*ptr, 0, nbytes);
     return ret;
 }
 

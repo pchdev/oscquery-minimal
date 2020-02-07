@@ -65,12 +65,12 @@ __nonnull((1));
    negative if capacity is exceeded, in which case, allocation
    does not occur.*/
 extern int
-wmemp_req(struct wmemp_t* mp, size_t nbytes, void* ptr)
+wmemp_req(struct wmemp_t* mp, size_t nbytes, void** ptr)
 __nonnull((1, 3));
 
 /** Same as wmemp_req, excepts it memsets allocated space to 0. */
 extern int
-wmemp_req0(struct wmemp_t* mp, size_t nbytes, void* ptr)
+wmemp_req0(struct wmemp_t* mp, size_t nbytes, void** ptr)
 __nonnull((1, 3));
 
 /** Expands local existing memory area, pushing back
