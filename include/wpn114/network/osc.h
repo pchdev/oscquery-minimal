@@ -29,16 +29,14 @@ int _wobdl_sizeof(void);
 const char*
 wosc_strerr(int err);
 
-enum wtype_t
-wosc_tag2tp(char tag);
-
-char
-wosc_tp2tag(enum wtype_t tp);
-
 /** Checks OSC method/uri for irregularities.
  * Returns zero if format is correct, >0 if incorrect */
 int
 wosc_checkuri(const char* uri)
+__nonnull((1));
+
+void
+womsg_printraw(womsg_t* msg)
 __nonnull((1));
 
 int
@@ -86,27 +84,6 @@ __nonnull((1));
 const char*
 womsg_gettag(womsg_t* msg)
 __nonnull((1));
-
-// typetag/ctype        | description
-// ---------------------|------------------------------------------------------------------------------------------------
-// i: [int32_t]         | 32-bit big-endian two's complement integer.
-// t: []                | 64-bit big-endian fixed-point time tag, semantics defined below.
-// f: [float]           | 32-bit big-endian IEEE 754 floating point number.
-// s: [const char*]     | A sequence of non-null ASCII characters followed by a null, followed by
-//                        0-3 additional null characters to make the total number of bits a multiple of 32.
-// b: []                | OSC-blob: An int32 size count, followed by that many 8-bit bytes of arbitrary binary
-//                        data, followed by 0-3 additional zero bytes to make the total number of bits a multiple of 32.
-// c: [char]            | An ASCII character, sent as 32-bits.
-// r: []                | 32-bit RGBA color.
-// m: [char[[4]]        | 4-bytes MIDI message. Bytes from MSB to LSB are: port id, status, data1, data2
-// T: [bool]            | True. No bytes are allocated in the argument data.
-// F: [bool]            | False. No bytes are allocated in the argument data.
-// N: []                | Nil. No bytes are allocated in the argument data.
-// I: []                | Infinitum. No bytes are allocated in the argument data.
-// [                    | Indicates the beginning of an array. The tags followed are for data in the Array until
-//                        a close brace tag is reached.
-// ]                    | Indicates the end on an array.
-
 
 int womsg_writei(womsg_t* msg, int32_t value) __nonnull((1));
 int womsg_writef(womsg_t* msg, float value) __nonnull((1));

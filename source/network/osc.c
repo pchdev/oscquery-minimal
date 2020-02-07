@@ -21,34 +21,6 @@ womsg_walloc(struct walloc_t* _allocator, womsg_t** _dst)
            _allocator->data);
 }
 
-enum wtype_t
-wosc_tag2tp(char tag)
-{
-    switch (tag) {
-    case 'i': return WTYPE_INT;
-    case 'f': return WTYPE_FLOAT;
-    case 'b': return WTYPE_BOOL;
-    case 'c': return WTYPE_CHAR;
-    case 's': return WTYPE_STRING;
-    case 'N': return WTYPE_NIL;
-    default: return WTYPE_INVALID;
-    }
-}
-
-char
-wosc_tp2tag(enum wtype_t tp)
-{
-    switch (tp) {
-    case WTYPE_INT:     return 'i';
-    case WTYPE_FLOAT:   return 'f';
-    case WTYPE_BOOL:    return 'b';
-    case WTYPE_CHAR:    return 'c';
-    case WTYPE_STRING:  return 's';
-    case WTYPE_NIL:     return 'N';
-    default:            return 0;
-    }
-}
-
 #define WOMSG_INVALID       0u
 #define WOMSG_WTAGLOCKED    1u
 #define WOMSG_WTAGFREE      2u
@@ -110,6 +82,16 @@ wosc_checkuri(const char* uri)
     return 0;
 }
 
+void
+womsg_printraw(struct womsg* dst)
+{
+    int n;
+    printf("%d", dst->buf[0]);
+    for (n = 1; n < dst->usd; ++n)
+        printf(", %d", dst->buf[n]);
+    printf("\n");
+}
+
 int
 womsg_decode(struct womsg* dst, byte_t* src, uint32_t len)
 {
@@ -134,6 +116,7 @@ womsg_setbuf(struct womsg* msg, byte_t* buf, uint32_t len)
     msg->ble = len;
     // set message in write mode
     msg->mode = WOMSG_W;
+    memset(buf, 0, len);
     return 0;
 }
 
@@ -392,17 +375,18 @@ womsg_reads(struct womsg* msg, char** dst)
 int
 womsg_readv(struct womsg* msg, wvalue_t* v)
 {
-    v->t = wosc_tag2tp(*womsg_gettag(msg));
+    v->t = *womsg_gettag(msg);
     switch (v->t) {
-    case WTYPE_INT:
+    case WOSC_TYPE_INT:
         return womsg_readi(msg, &v->u.i);
-    case WTYPE_BOOL:
+    case WOSC_TYPE_TRUE:
+    case WOSC_TYPE_FALSE:
         return womsg_readb(msg, &v->u.b);
-    case WTYPE_CHAR:
+    case WOSC_TYPE_CHAR:
         return womsg_readc(msg, &v->u.c);
-    case WTYPE_FLOAT:
+    case WOSC_TYPE_FLOAT:
         return womsg_readf(msg, &v->u.f);
-    case WTYPE_STRING: {
+    case WOSC_TYPE_STRING: {
         int err;
         char* s;
         if (!(err = womsg_reads(msg, &s))) {

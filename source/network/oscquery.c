@@ -142,28 +142,28 @@ wqnode_setv(wqnode_t* nd, wvalue_t* v)
 int
 wqnode_seti(wqnode_t* nd, int i)
 {
-    wvalue_t v = { .t = WTYPE_INT, .u.i = i };
+    wvalue_t v = { .t = WOSC_TYPE_INT, .u.i = i };
     return wqnode_setv(nd, &v);
 }
 
 int
 wqnode_setf(wqnode_t* nd, float f)
 {
-    wvalue_t v = { .t = WTYPE_FLOAT, .u.f = f };
+    wvalue_t v = { .t = WOSC_TYPE_FLOAT, .u.f = f };
     return wqnode_setv(nd, &v);
 }
 
 int
 wqnode_setc(wqnode_t* nd, char c)
 {    
-    wvalue_t v = { .t = WTYPE_CHAR, .u.c = c };
+    wvalue_t v = { .t = WOSC_TYPE_CHAR, .u.c = c };
     return wqnode_setv(nd, &v);
 }
 
 int
 wqnode_setb(wqnode_t* nd, bool b)
 {
-    wvalue_t v = { .t = WTYPE_BOOL, .u.b = b };
+    wvalue_t v = { .t = WOSC_TYPE_BOOL, .u.b = b };
     return wqnode_setv(nd, &v);
 }
 
@@ -171,7 +171,7 @@ int
 wqnode_sets(wqnode_t* nd, const char* s)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WTYPE_STRING))) {
+    if (!(err = wqnode_checktp(nd, WOSC_TYPE_STRING))) {
         if (strlen(s) > nd->value.u.s->cap)
             return WQUERY_STRBUF_OVERFLOW;
         memset(nd->value.u.s->dat, 0, nd->value.u.s->usd);
@@ -188,7 +188,7 @@ int
 wqnode_geti(wqnode_t* nd, int* i)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WTYPE_INT)))
+    if (!(err = wqnode_checktp(nd, WOSC_TYPE_INT)))
         *i = nd->value.u.i;
     return err;
 }
@@ -197,7 +197,7 @@ int
 wqnode_getf(wqnode_t* nd, float* f)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WTYPE_FLOAT)))
+    if (!(err = wqnode_checktp(nd, WOSC_TYPE_FLOAT)))
         *f = nd->value.u.f;
     return err;
 }
@@ -206,7 +206,7 @@ int
 wqnode_getc(wqnode_t* nd, char* c)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WTYPE_CHAR)))
+    if (!(err = wqnode_checktp(nd, WOSC_TYPE_CHAR)))
         *c = nd->value.u.c;
     return err;
 }
@@ -215,7 +215,7 @@ int
 wqnode_gets(wqnode_t* nd, const char** s)
 {
     int err;
-    if (!(err = wqnode_checktp(nd, WTYPE_STRING)))
+    if (!(err = wqnode_checktp(nd, WOSC_TYPE_STRING)))
         *s = nd->value.u.s->dat;
     return err;
 }
@@ -253,15 +253,15 @@ wqnode_attr_printj(wqnode_t* nd, const char* attr,
     if (strcmp(attr, "VALUE") == 0) {
         switch (nd->value.t) {
         // TOOO: check and return proper error if buffer overflow
-        case WTYPE_INT:     return sprintf(buf, "\"%s\": %d", attr, nd->value.u.i);
-        case WTYPE_FLOAT:   return sprintf(buf, "\"%s\": %f", attr, nd->value.u.f);
-        case WTYPE_CHAR:    return sprintf(buf, "\"%s\": %c", attr, nd->value.u.c);
-        case WTYPE_STRING:  return sprintf(buf, "\"%s\": \"%s\"", attr, nd->value.u.s->dat);
-        case WTYPE_BOOL:    return sprintf(buf, "\"%s\": %s", attr, nd->value.u.b ? "true":"false");
+        case WOSC_TYPE_INT:     return sprintf(buf, "\"%s\": %d", attr, nd->value.u.i);
+        case WOSC_TYPE_FLOAT:   return sprintf(buf, "\"%s\": %f", attr, nd->value.u.f);
+        case WOSC_TYPE_CHAR:    return sprintf(buf, "\"%s\": %c", attr, nd->value.u.c);
+        case WOSC_TYPE_STRING:  return sprintf(buf, "\"%s\": \"%s\"", attr, nd->value.u.s->dat);
+        case WOSC_TYPE_BOOL:    return sprintf(buf, "\"%s\": %s", attr, nd->value.u.b ? "true":"false");
         default:            return WQUERY_TYPE_MISMATCH;
         }
     } else if (strcmp(attr, "TYPE") == 0) {
-        return sprintf(buf, "\"%s\": %c", attr, wosc_tp2tag(nd->value.t));
+        return sprintf(buf, "\"%s\": %c", attr, nd->value.t);
     } else if (strcmp(attr, "ACCESS") == 0) {
         return sprintf(buf, "\"%s\": %d", attr, wqnode_getaccess(nd));
     } else if (strcmp(attr, "CRITICAL") == 0) {
@@ -291,7 +291,7 @@ wqnode_printj(wqnode_t* nd, char* buf, int len)
         return WQUERY_JBUF_OVERFLOW;
     else
         sprintf(buf, "{ \"%s\": { \"FULL_PATH\": %s", name, nd->uri);
-    if (nd->value.t != WTYPE_NIL) {
+    if (nd->value.t != WOSC_TYPE_NIL) {
         if ((lenp += wqnode_attr_printj(nd, "TYPE", buf+lenp, len)) >= len ||
             (lenp += wqnode_attr_printj(nd, "VALUE", buf+lenp, len) >= len) ||
             (lenp += wqnode_attr_printj(nd, "ACCESS", buf+lenp, len) >= len) ||
@@ -420,25 +420,25 @@ wqtree_addnd(wqtree_t* tree, const char* uri,
 int
 wqtree_addndi(wqtree_t* tree, const char* uri, wqnode_t** dst)
 {
-    return wqtree_addnd(tree, uri, WTYPE_INT, dst);
+    return wqtree_addnd(tree, uri, WOSC_TYPE_INT, dst);
 }
 
 int
 wqtree_addndf(wqtree_t* tree, const char* uri, wqnode_t** dst)
 {
-    return wqtree_addnd(tree, uri, WTYPE_FLOAT, dst);
+    return wqtree_addnd(tree, uri, WOSC_TYPE_FLOAT, dst);
 }
 
 int
 wqtree_addndb(wqtree_t* tree, const char* uri, wqnode_t** dst)
 {
-    return wqtree_addnd(tree, uri, WTYPE_BOOL, dst);
+    return wqtree_addnd(tree, uri, WOSC_TYPE_BOOL, dst);
 }
 
 int
 wqtree_addndc(wqtree_t* tree, const char* uri, wqnode_t** dst)
 {
-    return wqtree_addnd(tree, uri, WTYPE_CHAR, dst);
+    return wqtree_addnd(tree, uri, WOSC_TYPE_CHAR, dst);
 }
 
 int
@@ -447,7 +447,7 @@ wqtree_addnds(wqtree_t* tree, const char* uri,
 {
     int err;
     wstr_t* str;
-    if ((err = wqtree_addnd(tree, uri, WTYPE_STRING, dst)))
+    if ((err = wqtree_addnd(tree, uri, 's', dst)))
         return err;    
     if (!(err = wstr_walloc(tree->alloc, &str, strlim)))
         (*dst)->value.u.s->cap = strlim;
@@ -502,9 +502,9 @@ wqnode_update(wqnode_t* nd, womsg_t* womsg)
 {
     int err;
     enum wtype_t type;
-    type = wosc_tag2tp(*womsg_gettag(womsg));
+    type = *womsg_gettag(womsg);
     if (!(err = wqnode_checktp(nd, type))) {
-        if (type == WTYPE_STRING) {
+        if (type == WOSC_TYPE_STRING) {
             // todo: errcheck
             womsg_readv(womsg, &nd->value);
             if (nd->fn)
@@ -867,8 +867,7 @@ wqclient_tcp_hdl(struct mg_connection* mgc, int event, void* data)
     case MG_EV_POLL: break;
     case MG_EV_WEBSOCKET_HANDSHAKE_DONE: {
         // once handshake is done, request both host_info & json tree
-        char addr[32], port[8];
-        char url[64];
+        char addr[32], port[8], url[64];
         mg_sock_addr_to_str(&cli->cn.tcp->sa, addr, sizeof(addr), MG_SOCK_STRINGIFY_IP);
         mg_sock_addr_to_str(&cli->cn.tcp->sa, port, sizeof(port), MG_SOCK_STRINGIFY_PORT);
         sprintf(url, "ws://%s:%s/", addr, port);

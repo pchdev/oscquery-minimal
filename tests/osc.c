@@ -33,31 +33,31 @@ wtest(osc_01)
     // this would be an example for unknown tag messages
     while ((t = *tag++)) {
         switch (t) {
-        case 'f': {
+        case WOSC_TYPE_FLOAT: {
             float f;
             wtest_fassert_soft(womsg_readf(msg, &f));
             wpnout("value (float): %f\n", f);
             break;
         }
-        case 'i': {
+        case WOSC_TYPE_INT: {
             int i;
             wtest_fassert_soft(womsg_readi(msg, &i));
             wpnout("value (int): %d\n", i);
             break;
         }
-        case 'T': {
+        case WOSC_TYPE_TRUE: {
             bool b;
             wtest_fassert_soft(womsg_readb(msg, &b));
             wpnout("value (bool): %d\n", b);
             break;
         }
-        case 'c': {
+        case WOSC_TYPE_CHAR: {
             char c;
             wtest_fassert_soft(womsg_readc(msg, &c));
             wpnout("value (char): %c\n", c);
             break;
         }
-        case 's': {
+        case WOSC_TYPE_STRING: {
             char* s;
             wtest_fassert_soft(womsg_reads(msg, &s));
             wtest_fassert_soft(strcmp(s, "owls are not what they seem"));
@@ -72,11 +72,36 @@ wtest(osc_01)
 }
 
 // get a raw message
-void
-wosc_unittest_02(void)
+wtest(osc_02)
 {
+    wtest_begin(osc_02);
+    byte_t buf[64] = {
+        47, 116, 101, 115,
+       116,  95,  48,  50,
+         0,   0,   0,   0,
+        44, 102, 105, 115,
+         0,   0,   0,   0,
+       113,  61,  61,  66,
+        16,   0,   0,   0,
+       116, 119, 111,  32,
+        99, 111, 111, 112,
+       101, 114, 115,   0
+    };
     womsg_t* msg;
+    float f;
+    int i;
+    char* c;
     womsg_alloca(&msg);
+    womsg_decode(msg, buf, sizeof(buf));
+    wtest_fassert_soft(strcmp(womsg_geturi(msg), "/test_02"));
+    wtest_fassert_soft(strcmp(womsg_gettag(msg), "fis"));
+    wtest_fassert_soft(womsg_readf(msg, &f));
+    wtest_fassert_soft(womsg_readi(msg, &i));
+    wtest_fassert_soft(womsg_reads(msg, &c));
+    wtest_assert_soft(f == 47.31f);
+    wtest_assert_soft(i == 16);
+    wtest_fassert_soft(strcmp(c, "two coopers"));
+    wtest_end;
 }
 
 int
@@ -84,5 +109,6 @@ main(void)
 {
     int err = 0;
     err += wpn_unittest_osc_01();
+    err += wpn_unittest_osc_02();
     return err;
 }
