@@ -16,7 +16,7 @@ int _womsg_sizeof(void) { return sizeof(struct womsg); }
 int
 womsg_walloc(struct walloc_t* _allocator, womsg_t** _dst)
 {
-    return _allocator->alloc((void**)_dst,
+    return _allocator->alloc(_dst,
            sizeof(struct womsg),
            _allocator->data);
 }

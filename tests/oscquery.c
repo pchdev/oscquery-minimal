@@ -64,6 +64,7 @@ wtest(query_01)
     wtest_fassert_soft(wqnode_seti(ndi, 47));
     wqnode_geti(ndi, &ndi_v);
     wtest_assert_soft(ndi_v == 47);
+    wqtree_print(tree);
     wtest_end;
 }
 
@@ -81,6 +82,7 @@ wtest(query_02)
     wtest_fassert_soft(wqnode_sets(nds, "owls are not what they seem"));
     wtest_fassert_soft(wqnode_gets(nds, &nds_v));
     wtest_fassert_soft(strcmp(nds_v, "owls are not what they seem"));
+    wqtree_print(tree);
     wtest_end;
 }
 
@@ -92,72 +94,60 @@ wtest(query_03)
     wqtree_t* tree;
     wqnode_t* ndf;
     wtest_fassert_soft(wqserver_walloc(&wqmp_03, &server));
-    wqserver_zro(server);
     wtest_fassert_soft(wqtree_walloc(&wqmp_03, &tree));
     wtest_fassert_soft(wqtree_addndf(tree, "/float", &ndf));
     wqnode_setfn(ndf, ndf_fn, NULL);
     wtest_fassert_soft(wqnode_setf(ndf, 27.31));
     wqserver_expose(server, tree);
     wtest_fassert_soft(wqserver_run(server, 1234, 5678));
-    wpnout("running oscquery server on port 5678\n");
-    while (s_sig == 0)
-        sleep(1);
-
+    wqtree_print(tree);
     wtest_end;
-
 }
 
-int
-wquery_unittest_04(void)
+wpn_declstatic_alloc_mp(wqmp_04, 1024);
+wtest(query_04)
 {
-    int err;
+    wtest_begin(query_04);
+    wqserver_t* server;
+    wqclient_t* client;
     wqtree_t* tree;
-    wqtree_walloc(&wqmp_03, &tree);
+    wqnode_t *ndi, *ndf, *ndb, *ndc, *nds;
 
-    // we don't want intermediate nodes to be created as not to use too much memory
-    wqnode_t *ind, *fnd, *bnd, *cnd, *snd;
-    if ((err = wqtree_addndi(tree, "/foo/bar/int", &ind)) ||
-        (err = wqtree_addndf(tree, "/foo/bar/float", &fnd)) ||
-        (err = wqtree_addndc(tree, "/foo/bar/char", &cnd)) ||
-        (err = wqtree_addnds(tree, "/foo/bar/string", &snd, 32)) ||
-        (err = wqtree_addndb(tree, "/foo/bar/bool", &bnd))) {
-        wpnerr("%s, %d\n", wquery_strerr(err), err);
-        return 1;
-    }
-    wmemp_rmnprint(wqmp_03.data);
+    wtest_fassert_soft(wqtree_walloc(&wqmp_04, &tree));
+    wtest_fassert_soft(wqtree_addndi(tree, "/foo/bar/int", &ndi));
+    wtest_fassert_soft(wqtree_addndf(tree, "/foo/bar/float", &ndf));
+    wtest_fassert_soft(wqtree_addndb(tree, "/foo/bar/bool", &ndb));
+    wtest_fassert_soft(wqtree_addndc(tree, "/foo/bar/char", &ndc));
+    wtest_fassert_soft(wqtree_addnds(tree, "/foo/bar/string", &nds, 32));
+    wmemp_rmnprint(&wqmp_04_mp);
+    wqnode_setfn(ndi, ndi_fn, tree);
+    wqnode_setfn(ndf, ndf_fn, NULL);
+    wtest_fassert_soft(wqnode_setfl(ndi, WQNODE_CRITICAL | WQNODE_FN_SETPRE));
+    wtest_fassert_soft(wqnode_setfl(ndf, WQNODE_NOREPEAT | WQNODE_FN_SETPRE));
+    wtest_fassert_soft(wqnode_setfl(ndb, WQNODE_CRITICAL));
+    wtest_fassert_soft(wqnode_setfl(ndb, WQNODE_NOREPEAT));
+    wtest_fassert_soft(wqnode_setfl(nds, WQNODE_NOREPEAT | WQNODE_CRITICAL));
+    wtest_fassert_soft(wqnode_seti(ndi, 43));
+    wtest_fassert_soft(wqnode_setf(ndf, 47.31));
+    wtest_fassert_soft(wqnode_setb(ndb, true));
+    wtest_fassert_soft(wqnode_setc(ndc, 'A'));
+    wtest_fassert_soft(wqnode_sets(nds, "is it about the bunny?"));
 
-    wqnode_setfn(ind, ndi_fn, tree);
-    wqnode_setfn(fnd, ndf_fn, NULL);
+    wtest_fassert_soft(wqserver_walloc(&wqmp_04, &server));
+    wtest_fassert_soft(wqclient_walloc(&wqmp_04, &client));
+    wmemp_rmnprint(&wqmp_04_mp);
+    wqserver_expose(server, tree);
+    wtest_fassert_soft(wqserver_run(server, 4731, 4389));
+    wtest_fassert_soft(wqclient_connect(client, "127.0.0.1", 4389));
 
-    wqnode_setfl(ind, WQNODE_CRITICAL | WQNODE_FN_SETPRE);
-    wqnode_setfl(fnd, WQNODE_NOREPEAT | WQNODE_FN_SETPRE);
-    wqnode_setfl(bnd, WQNODE_CRITICAL);
-    wqnode_setfl(cnd, WQNODE_CRITICAL);
-    wqnode_setfl(snd, WQNODE_CRITICAL);
-
-    wqnode_seti(ind, 43);
-    wqnode_setf(fnd, 47.31);
-    wqnode_setb(bnd, true);
-    wqnode_setc(cnd, 'A');
-    wqnode_sets(snd, "hello world!");
-
-    wqserver_t* qserver;
-    wqserver_walloc(&wqmp_03, &qserver);
-    wmemp_rmnprint(wqmp_03.data);
-    wqserver_zro(qserver);
-    wqserver_expose(qserver, tree);
-    wqserver_run(qserver, 4731, 4389);
-
-    while (s_sig == 0) {
-#ifdef WPN114_MULTITHREAD
-        sleep(1);
-#else
-//        wqserver_iterate(qserver, 200);
-        sleep(1);
-#endif
-    }
-
-    return err;
+//    TODO: check mirrors
+//    wqnode_t* ndi_mirror;
+//    int ndi_mirror_v;
+//    wqclient_getnd(client, "/foo/bar/int", &ndi_mirror);
+//    wqnode_geti(ndi_mirror, &ndi_mirror_v);
+//    wtest_assert_soft(ndi_mirror_v == 43);
+//    wtest_fassert_soft(wqnode_seti(ndi_mirror, 22));
+    wtest_end;
 }
 
 int
@@ -167,5 +157,6 @@ main(void)
     err += wpn_unittest_query_01();
     err += wpn_unittest_query_02();
     err += wpn_unittest_query_03();
+    err += wpn_unittest_query_04();
     return err;
 }

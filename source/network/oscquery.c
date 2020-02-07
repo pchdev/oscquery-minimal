@@ -236,11 +236,11 @@ int
 wqnode_getaccess(wqnode_t* nd)
 {
     if (nd->flags & WQNODE_READONLY)
-        return WQNODE_READONLY;
+        return WQNODE_ACCESS_R;
     else if (nd->flags & WQNODE_WRITEONLY)
-        return WQNODE_WRITEONLY;
+        return WQNODE_ACCESS_W;
     else
-        return 3;
+        return WQNODE_ACCESS_RW;
 }
 
 static int
@@ -338,9 +338,24 @@ wqtree_walloc(struct walloc_t* _allocator, wqtree_t** _dst)
     if ((err = _allocator->alloc(_dst, sizeof(struct wqtree),
                _allocator->data)) >= 0) {
         (*_dst)->alloc = _allocator;
-        err = 0;
+        memset(&(*_dst)->root, 0, sizeof(struct wqnode));
+        (*_dst)->root.uri = "/";
+       err = 0;
     }
     return err;
+}
+
+void
+wqtree_print(struct wqtree* tree)
+{
+    wqnode_t* nd;
+    nd = &tree->root;
+    while (nd) {
+        printf("node: %s\n", nd->uri);
+        if (nd->sib)
+            nd = nd->sib;
+        else nd = nd->chd;
+    }
 }
 
 static inline void
@@ -407,11 +422,9 @@ wqtree_addnd(wqtree_t* tree, const char* uri,
     if (wosc_checkuri(uri))
         return WQUERY_URI_INVALID;
     if ((err = wqnode_walloc(tree->alloc, &nd)) < 0) {
-        wpnerr("walloc failed");
         return err;
     }
     if ((parent = wqtree_getparent(tree, uri)) == NULL) {
-        wpnerr("getparent failed");
         return 43; // TODO: add proper error code: not enough memory space
     }
     nd->value.t = type;
@@ -588,16 +601,13 @@ struct wqserver {
 int
 wqserver_walloc(struct walloc_t* _allocator, wqserver_t** dst)
 {
-    return _allocator->alloc((void**)dst,
-           sizeof(struct wqserver),
-           _allocator->data);
-}
-
-void
-wqserver_zro(wqserver_t* server)
-{
-    memset(server, 0, sizeof(struct wqserver));
-    mg_mgr_init(&server->mgr, server);
+    int err;
+    if ((err = _allocator->alloc(dst, sizeof(struct wqserver),
+               _allocator->data)) >= 0) {
+        memset(*dst, 0, sizeof(struct wqserver));
+        err = 0;
+    }
+    return err;
 }
 
 int
@@ -796,6 +806,7 @@ wqserver_run(wqserver_t* server, uint16_t udpport, uint16_t wsport)
     sprintf(s_tcp, "%d", wsport);
     sprintf(s_udp, "%d", udpport);
     strcat(udp_hdr, s_udp);
+    mg_mgr_init(&server->mgr, server);
     if ((c_tcp = mg_bind(&server->mgr, s_tcp,
                  wqserver_tcp_hdl)) == NULL) {
         return WQUERY_BINDERR_TCP;
@@ -843,17 +854,15 @@ struct wqclient {
 int
 wqclient_walloc(struct walloc_t* _allocator, wqclient_t** dst)
 {
-    return _allocator->alloc((void**)dst,
-            sizeof(struct wqclient),
-            _allocator->data);
+    int err;
+    if ((err = _allocator->alloc(dst, sizeof(struct wqclient),
+               _allocator->data)) >= 0) {
+        memset(*dst, 0, sizeof(struct wqclient));
+        err = 0;
+    }
+    return err;
 }
 
-void
-wqclient_zro(wqclient_t* client)
-{
-    memset(client, 0, sizeof(struct wqclient));
-    mg_mgr_init(&client->mgr, client);
-}
 
 static void*
 wqclient_pthread_run(void* v)
@@ -939,6 +948,7 @@ wqclient_connect(wqclient_t* client, const char* addr, uint16_t port)
     char waddr[32];
     struct mg_connection* mgct, *mgcu;
     sprintf(waddr, "%s:%d", addr, port);
+    mg_mgr_init(&client->mgr, client);
     if ((mgcu = mg_bind(&client->mgr, "udp://1234", wqclient_udp_hdl)) == NULL)
         return WQUERY_BINDERR_UDP;
     if ((mgct = mg_connect_ws(&client->mgr, wqclient_tcp_hdl, waddr, NULL, NULL)) == NULL)

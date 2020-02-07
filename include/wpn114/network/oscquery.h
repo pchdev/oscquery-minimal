@@ -104,6 +104,10 @@ extern int
 wqtree_walloc(struct walloc_t* allocator, wqtree_t** dst)
 __nonnull((1));
 
+extern void
+wqtree_print(wqtree_t* tree)
+__nonnull((1));
+
 extern int
 wqtree_setfl(wqtree_t* tree, enum wqflags_t flags)
 __nonnull((1));
@@ -131,10 +135,6 @@ extern int
 wqserver_walloc(struct walloc_t* alloc, wqserver_t** dst)
 __nonnull((1, 2));
 
-extern void
-wqserver_zro(wqserver_t* server)
-__nonnull((1));
-
 extern int
 wqserver_expose(wqserver_t* server, wqtree_t* tree)
 __nonnull((1, 2));
@@ -156,10 +156,6 @@ typedef struct wqclient wqclient_t;
 extern int
 wqclient_walloc(struct walloc_t* alloc, wqclient_t** dst)
 __nonnull((1, 2));
-
-extern void
-wqclient_zro(wqclient_t* client)
-__nonnull((1));
 
 extern int
 wqclient_connect(wqclient_t* client, const char* addr, uint16_t port)
