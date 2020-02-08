@@ -1,6 +1,51 @@
 #include <wpn114/network/osc.h>
 #include <wpn114/utilities.h>
 
+enum womsg_err {
+    WOMSG_NOERROR,
+    WOMSG_READ_ONLY,
+    WOMSG_WRITE_ONLY,
+    WOMSG_TAG_MISMATCH,
+    WOMSG_TAG_END,
+    WOMSG_BUFFER_OVERFLOW,
+    WOMSG_URI_INVALID
+};
+
+int
+wosc_checkuri(const char* uri)
+{
+    char c;
+    if (*uri != '/')
+        return WOMSG_URI_INVALID;
+    // TODO:
+    // pattern match the rest,
+    // basically, check invalid characters
+    return 0;
+}
+
+const char*
+wosc_strerr(int err)
+{
+    switch (err) {
+    case WOMSG_NOERROR:
+        return "no error";
+    case WOMSG_READ_ONLY:
+        return "message is in read-only mode";
+    case WOMSG_WRITE_ONLY:
+        return "message is in write-only mode";
+    case WOMSG_TAG_MISMATCH:
+        return "mismatching argument tag for read/write function";
+    case WOMSG_TAG_END:
+        return "reaching end of arguments";
+    case WOMSG_BUFFER_OVERFLOW:
+        return "buffer overflow";
+    case WOMSG_URI_INVALID:
+        return "invalid method/uri";
+    default:
+        return "unknown error code";
+    }
+}
+
 struct womsg {
     byte_t* buf;         // message buffer
     byte_t* rwi;         // mandatory, data read/write index
@@ -31,56 +76,8 @@ womsg_walloc(struct walloc_t* _allocator, womsg_t** _dst)
 #define _tagnc(_womsg)      (_tag(_womsg)+1)
 #define _nexttag(_womsg)    (*(_tagnc(_womsg)+_womsg->idx))
 
-enum womsg_err {
-    WOMSG_NOERROR,
-    WOMSG_READ_ONLY,
-    WOMSG_WRITE_ONLY,
-    WOMSG_TAG_MISMATCH,
-    WOMSG_TAG_END,
-    WOMSG_BUFFER_OVERFLOW,
-    WOMSG_URI_INVALID
-};
-
-const char*
-wosc_strerr(int err)
-{
-    switch (err) {
-    case WOMSG_NOERROR:
-        return "no error";
-    case WOMSG_READ_ONLY:
-        return "message is in read-only mode";
-    case WOMSG_WRITE_ONLY:
-        return "message is in write-only mode";
-    case WOMSG_TAG_MISMATCH:
-        return "mismatching argument tag for read/write function";
-    case WOMSG_TAG_END:
-        return "reaching end of arguments";
-    case WOMSG_BUFFER_OVERFLOW:
-        return "buffer overflow";
-    case WOMSG_URI_INVALID:
-        return "invalid method/uri";
-    default:
-        return "unknown error code";
-    }
-}
-
 static __always_inline int
-womsg_npads(int sz)
-{
-    return 4-(sz%4);
-}
-
-int
-wosc_checkuri(const char* uri)
-{
-    char c;
-    if (*uri != '/')
-        return WOMSG_URI_INVALID;
-    // TODO:
-    // pattern match the rest,
-    // basically, check invalid characters
-    return 0;
-}
+womsg_npads(int sz) { return 4-(sz%4); }
 
 void
 womsg_printraw(struct womsg* dst)
@@ -100,12 +97,15 @@ womsg_decode(struct womsg* dst, byte_t* src, uint32_t len)
     dst->ble = len;
     dst->usd = len;
     dst->mode = WOMSG_R;
+
     ulen = strlen((char*)src);
     ulen += womsg_npads(ulen);
     dst->tag = ulen;
+
     tlen = strlen((char*)&src[ulen])+1;
     tlen += womsg_npads(tlen);
     dst->rwi = &src[ulen+tlen];
+
     return 0;
 }
 
@@ -159,6 +159,7 @@ womsg_settag(struct womsg* msg, const char* tag)
     int len = strlen(tag)+1;
     strcpy(ptr++, ",");
     strcpy(ptr, tag);
+
     msg->usd += len+womsg_npads(len);
     msg->rwi = &msg->buf[msg->usd];
     msg->mode = WOMSG_WTAGLOCKED;

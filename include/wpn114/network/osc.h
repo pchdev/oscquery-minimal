@@ -14,6 +14,15 @@ extern "C" {
 typedef struct womsg womsg_t;
 typedef struct wobdl wobdl_t;
 
+const char*
+wosc_strerr(int err);
+
+/** Checks OSC method/uri for irregularities.
+ * Returns zero if format is correct, >0 if incorrect */
+int
+wosc_checkuri(const char* uri)
+__nonnull((1));
+
 #define womsg_alloca(_ptr)                                   \
     do { *_ptr = (womsg_t*) alloca(_womsg_sizeof());         \
          memset(*_ptr, 0, _womsg_sizeof()); } while (0)
@@ -26,19 +35,12 @@ __nonnull((1));
 int _womsg_sizeof(void);
 int _wobdl_sizeof(void);
 
-const char*
-wosc_strerr(int err);
-
-/** Checks OSC method/uri for irregularities.
- * Returns zero if format is correct, >0 if incorrect */
-int
-wosc_checkuri(const char* uri)
-__nonnull((1));
-
 void
 womsg_printraw(womsg_t* msg)
 __nonnull((1));
 
+/** Decodes a raw osc-encoded message, ready to be
+ * read through <dst> message handle */
 int
 womsg_decode(womsg_t* dst, byte_t* src, uint32_t len)
 __nonnull((1, 2));
@@ -80,7 +82,7 @@ int
 womsg_getargc(womsg_t* msg)
 __nonnull((1));
 
-/* Returns message's argument tagline */
+/** Returns message's argument tagline */
 const char*
 womsg_gettag(womsg_t* msg)
 __nonnull((1));

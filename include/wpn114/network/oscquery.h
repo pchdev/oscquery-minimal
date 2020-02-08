@@ -67,23 +67,23 @@ void (*wqnode_fn) (
 
 /** Sets <node> flags. Returns error if incorrect */
 extern int
-wqnode_setfl(wqnode_t* node, enum wqflags_t flg)
+wqnode_set_flags(wqnode_t* node, enum wqflags_t flg)
 __nonnull((1));
 
 /** Sets <node> value callback function, which will be
  * called each time a new value is received */
 extern void
-wqnode_setfn(wqnode_t* node, wqnode_fn fn, void* udata)
+wqnode_set_fn(wqnode_t* node, wqnode_fn fn, void* udata)
 __nonnull((1, 2));
 
 /** Returns <node> access mode (1: R, 2: W, 3: R/W) */
 extern int
-wqnode_getaccess(wqnode_t* node)
+wqnode_get_access(wqnode_t* node)
 __nonnull((1));
 
 /** Returns <node> name */
 extern const char*
-wqnode_getname(wqnode_t* nd)
+wqnode_get_name(wqnode_t* nd)
 __nonnull((1));
 
 extern int wqnode_seti(wqnode_t* node, int i) __nonnull((1));;
@@ -100,22 +100,23 @@ extern int wqnode_gets(wqnode_t* node, const char** s) __nonnull((1, 2));;
 
 typedef struct wqtree wqtree_t;
 
+/** Allocates <dst> tree from <allocator> */
 extern int
 wqtree_walloc(struct walloc_t* allocator, wqtree_t** dst)
 __nonnull((1));
 
+/** Prints the formatted tree/node strcture to stdout */
 extern void
 wqtree_print(wqtree_t* tree)
 __nonnull((1));
 
+/** Sets tree general flags */
 extern int
-wqtree_setfl(wqtree_t* tree, enum wqflags_t flags)
+wqtree_set_flags(wqtree_t* tree, enum wqflags_t flags)
 __nonnull((1));
 
-extern int
-wqtree_addnd(wqtree_t* tree, const char* uri, enum wtype_t wtp, wqnode_t** dst)
-__nonnull((1, 2, 4));
-
+/** Adds node to tree, with <wtp> type and <uri>,
+ * sets <dst> to point to the newly created node */
 extern int wqtree_addndi(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));
 extern int wqtree_addndf(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));
 extern int wqtree_addndb(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));
@@ -125,20 +126,26 @@ extern int wqtree_addndc(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonn
 extern int wqtree_addnds(wqtree_t* tree, const char* uri, wqnode_t** dst,
                          int strlim) __nonnull((1, 2, 3));
 
+/** Gets node handle from the tree, returns NULL if
+ * target could not be found */
 extern wqnode_t*
-wqtree_getnd(wqtree_t* tree, const char* uri)
+wqtree_get_node(wqtree_t* tree, const char* uri)
 __nonnull((1, 2));
 
+/** A handle on an oscquery server data structure */
 typedef struct wqserver wqserver_t;
 
+/** Allocates <dst> oscquery server from <allocator> */
 extern int
-wqserver_walloc(struct walloc_t* alloc, wqserver_t** dst)
+wqserver_walloc(struct walloc_t* allocator, wqserver_t** dst)
 __nonnull((1, 2));
 
+/** Expose <tree> of wqnodes on the network */
 extern int
 wqserver_expose(wqserver_t* server, wqtree_t* tree)
 __nonnull((1, 2));
 
+/** Runs the oscquery <server> on <tcpport> and <udpport> */
 extern int
 wqserver_run(wqserver_t* server, uint16_t udpport, uint16_t tcpport)
 __nonnull((1));

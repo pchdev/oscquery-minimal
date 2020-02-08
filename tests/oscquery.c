@@ -45,10 +45,8 @@ nds_fn(wqnode_t* nd, wvalue_t* v, void* udt)
     wpnout("/foo/bar/float value: %s\n", v->u.s->dat);
 }
 
-wpn_declstatic_alloc_mp(wqmp_01, 256);
-
 // simple int node test
-
+wpn_declstatic_alloc_mp(wqmp_01, 256);
 wtest(query_01)
 {
     wtest_begin(query_01);
@@ -57,20 +55,20 @@ wtest(query_01)
     int ndi_v;
     wtest_fassert_soft(wqtree_walloc(&wqmp_01, &tree));
     wtest_fassert_soft(wqtree_addndi(tree, "/foo/bar/int", &ndi));
-    wtest_fassert_soft(strcmp(wqnode_getname(ndi), "int"));
-    wtest_assert_soft(wqnode_getaccess(ndi) == WQNODE_ACCESS_RW);
+    wtest_fassert_soft(strcmp(wqnode_get_name(ndi), "int"));
+    wtest_assert_soft(wqnode_get_access(ndi) == WQNODE_ACCESS_RW);
     wtest_fassert_soft(wqnode_geti(ndi, &ndi_v));
     wtest_fassert_soft(ndi_v);
     wtest_fassert_soft(wqnode_seti(ndi, 47));
     wqnode_geti(ndi, &ndi_v);
     wtest_assert_soft(ndi_v == 47);
     wqtree_print(tree);
+    wmemp_rmnprint(&wqmp_01_mp);
     wtest_end;
 }
 
 // test with string node
 wpn_declstatic_alloc_mp(wqmp_02, 256);
-
 wtest(query_02)
 {
     wtest_begin(query_02);
@@ -83,10 +81,11 @@ wtest(query_02)
     wtest_fassert_soft(wqnode_gets(nds, &nds_v));
     wtest_fassert_soft(strcmp(nds_v, "owls are not what they seem"));
     wqtree_print(tree);
+    wmemp_rmnprint(&wqmp_02_mp);
     wtest_end;
 }
 
-wpn_declstatic_alloc_mp(wqmp_03, 512);
+wpn_declstatic_alloc_mp(wqmp_03, 256);
 wtest(query_03)
 {
     wtest_begin(query_03);
@@ -96,11 +95,12 @@ wtest(query_03)
     wtest_fassert_soft(wqserver_walloc(&wqmp_03, &server));
     wtest_fassert_soft(wqtree_walloc(&wqmp_03, &tree));
     wtest_fassert_soft(wqtree_addndf(tree, "/float", &ndf));
-    wqnode_setfn(ndf, ndf_fn, NULL);
+    wqnode_set_fn(ndf, ndf_fn, NULL);
     wtest_fassert_soft(wqnode_setf(ndf, 27.31));
     wqserver_expose(server, tree);
     wtest_fassert_soft(wqserver_run(server, 1234, 5678));
     wqtree_print(tree);
+    wmemp_rmnprint(&wqmp_03_mp);
     wtest_end;
 }
 
@@ -119,14 +119,15 @@ wtest(query_04)
     wtest_fassert_soft(wqtree_addndb(tree, "/foo/bar/bool", &ndb));
     wtest_fassert_soft(wqtree_addndc(tree, "/foo/bar/char", &ndc));
     wtest_fassert_soft(wqtree_addnds(tree, "/foo/bar/string", &nds, 32));
+    wqtree_print(tree);
     wmemp_rmnprint(&wqmp_04_mp);
-    wqnode_setfn(ndi, ndi_fn, tree);
-    wqnode_setfn(ndf, ndf_fn, NULL);
-    wtest_fassert_soft(wqnode_setfl(ndi, WQNODE_CRITICAL | WQNODE_FN_SETPRE));
-    wtest_fassert_soft(wqnode_setfl(ndf, WQNODE_NOREPEAT | WQNODE_FN_SETPRE));
-    wtest_fassert_soft(wqnode_setfl(ndb, WQNODE_CRITICAL));
-    wtest_fassert_soft(wqnode_setfl(ndb, WQNODE_NOREPEAT));
-    wtest_fassert_soft(wqnode_setfl(nds, WQNODE_NOREPEAT | WQNODE_CRITICAL));
+    wqnode_set_fn(ndi, ndi_fn, tree);
+    wqnode_set_fn(ndf, ndf_fn, NULL);
+    wtest_fassert_soft(wqnode_set_flags(ndi, WQNODE_CRITICAL | WQNODE_FN_SETPRE));
+    wtest_fassert_soft(wqnode_set_flags(ndf, WQNODE_NOREPEAT | WQNODE_FN_SETPRE));
+    wtest_fassert_soft(wqnode_set_flags(ndb, WQNODE_CRITICAL));
+    wtest_fassert_soft(wqnode_set_flags(ndb, WQNODE_NOREPEAT));
+    wtest_fassert_soft(wqnode_set_flags(nds, WQNODE_NOREPEAT | WQNODE_CRITICAL));
     wtest_fassert_soft(wqnode_seti(ndi, 43));
     wtest_fassert_soft(wqnode_setf(ndf, 47.31));
     wtest_fassert_soft(wqnode_setb(ndb, true));

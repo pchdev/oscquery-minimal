@@ -1,12 +1,11 @@
 #include <wpn114/alloc.h>
 #include <wpn114/utilities.h>
 
-
 int
 walloc_dynamic(void* dst, size_t nbytes,
                WPN_UNUSED void* data)
 {
-    return (dst = malloc(nbytes)) == NULL;
+    return -((dst = malloc(nbytes)) == NULL);
 }
 
 int
