@@ -1,6 +1,7 @@
 #include <wpn114/network/oscquery.h>
 #include <wpn114/utilities.h>
 #include <dependencies/mjson/mjson.h>
+#include <assert.h>
 
 #define WQNODE_IGNORE 0
 #define WQNODE_LISTEN 1
@@ -52,8 +53,8 @@ wstr_walloc(struct walloc_t* _allocator, wstr_t** dst, uint16_t strlim)
 
 // we want to limit this to 64 bytes
 struct wqnode {
-    struct wqnode* sib;
-    struct wqnode* chd;
+    struct wqnode* sibling;
+    struct wqnode* child;
     const char* uri;
     wqnode_fn fn;
     void* udt;
@@ -74,7 +75,7 @@ static int
 wqnode_set_uri(wqnode_t* nd, const char* uri)
 {
     int err;
-    if (!(err = wosc_checkuri(uri)))
+    if (!(err = wuri_check(uri)))
         nd->uri = uri;
     return err;
 }
@@ -95,21 +96,24 @@ wqnode_set_flags(wqnode_t* nd, enum wqflags_t fl)
 }
 
 static inline int
-wqnode_add_sibling(wqnode_t* nd, wqnode_t* sib)
+wqnode_add_sibling(wqnode_t* node, wqnode_t* sibling)
 {
-    while (nd->sib)
-        nd = nd->sib;
-    nd->sib = sib;
+    while (node->sibling)
+        node = node->sibling;
+    node->sibling = sibling;
+    wpnout("adding %s as a sibling to %s\n", sibling->uri, node->uri);
     return 0;
 }
 
 static inline int
-wqnode_add_child(wqnode_t* nd, wqnode_t* chd)
+wqnode_add_child(wqnode_t* parent, wqnode_t* child)
 {
-    if (nd->chd == NULL) {
-        nd->chd = chd;
+    if (parent->child == NULL) {
+        parent->child = child;
+        wpnout("adding node %s to parent %s\n",
+               child->uri, parent->uri);
     } else {
-        wqnode_add_sibling(nd->chd, chd);
+        wqnode_add_sibling(parent->child, child);
     }
     return 0;
 }
@@ -224,11 +228,8 @@ wqnode_gets(wqnode_t* nd, const char** s)
 const char*
 wqnode_get_name(wqnode_t* nd)
 {
-    int len = strlen(nd->uri);
-    const char* name = &nd->uri[len-1];
-    while (*--name != '/')
-          ;
-    return ++name;
+    const char* last = wuri_last(nd->uri);
+    return ++last;
 }
 
 int
@@ -240,88 +241,6 @@ wqnode_get_access(wqnode_t* nd)
         return WQNODE_ACCESS_W;
     else
         return WQNODE_ACCESS_RW;
-}
-
-static int
-wqnode_contents_printj(wqnode_t* nd, char* buf, int len);
-
-static int
-wqnode_attr_printj(wqnode_t* nd, const char* attr,
-                   char* buf, int len)
-{
-    if (strcmp(attr, "VALUE") == 0) {
-        switch (nd->value.t) {
-        // TOOO: check and return proper error if buffer overflow
-        case WOSC_TYPE_INT:     return sprintf(buf, "\"%s\": %d", attr, nd->value.u.i);
-        case WOSC_TYPE_FLOAT:   return sprintf(buf, "\"%s\": %f", attr, nd->value.u.f);
-        case WOSC_TYPE_CHAR:    return sprintf(buf, "\"%s\": %c", attr, nd->value.u.c);
-        case WOSC_TYPE_STRING:  return sprintf(buf, "\"%s\": \"%s\"", attr, nd->value.u.s->dat);
-        case WOSC_TYPE_BOOL:    return sprintf(buf, "\"%s\": %s", attr, nd->value.u.b ? "true":"false");
-        default:            return WQUERY_TYPE_MISMATCH;
-        }
-    } else if (strcmp(attr, "TYPE") == 0) {
-        return sprintf(buf, "\"%s\": %c", attr, nd->value.t);
-    } else if (strcmp(attr, "ACCESS") == 0) {
-        return sprintf(buf, "\"%s\": %d", attr, wqnode_get_access(nd));
-    } else if (strcmp(attr, "CRITICAL") == 0) {
-        if (nd->flags & WQNODE_CRITICAL)
-            return sprintf(buf, "\"%s\": true", attr);
-        else
-            return 0;
-    } else if (strcmp(attr, "REPETITION_FILTER") == 0) {
-        if (nd->flags & WQNODE_NOREPEAT)
-            return sprintf(buf, "\"%s\": true", attr);
-        else
-            return 0;
-    }
-    return WQUERY_ATTR_UNSUPPORTED;
-}
-
-static int
-wqnode_printj(wqnode_t* nd, char* buf, int len)
-{
-    const char* name;
-    int lenp;
-    name = wqnode_get_name(nd);
-    lenp = strlen(name)
-         + strlen(nd->uri)
-         + 25;
-    if (lenp >= len)
-        return WQUERY_JBUF_OVERFLOW;
-    else
-        sprintf(buf, "{ \"%s\": { \"FULL_PATH\": %s", name, nd->uri);
-    if (nd->value.t != WOSC_TYPE_NIL) {
-        if ((lenp += wqnode_attr_printj(nd, "TYPE", buf+lenp, len)) >= len ||
-            (lenp += wqnode_attr_printj(nd, "VALUE", buf+lenp, len) >= len) ||
-            (lenp += wqnode_attr_printj(nd, "ACCESS", buf+lenp, len) >= len) ||
-            (lenp += wqnode_attr_printj(nd, "CRITICAL", buf+lenp, len) >= len) ||
-            (lenp += wqnode_attr_printj(nd, "REPETITION_FILTER", buf+lenp, len) >= len)) {
-            return WQUERY_JBUF_OVERFLOW;
-        }
-    }
-    if ((lenp += wqnode_contents_printj(nd, buf+lenp, len)) >= len)
-        return WQUERY_JBUF_OVERFLOW;
-    strcat(buf, " }");
-    return 0;
-}
-
-static int
-wqnode_contents_printj(wqnode_t* nd, char* buf, int len)
-{
-    int err;
-    if (!nd->chd)
-        return 0;
-    // todo:
-    // if there are any intermediate containers, print them as well..
-    strcat(buf, "\"CONTENTS\": ");
-    wqnode_t* child;
-    child = nd->chd;
-    err = wqnode_printj(nd, buf, len);
-    while (child->sib) {
-        err = wqnode_printj(child->sib, buf, len);
-        child = child->sib;
-    }
-    return err;
 }
 
 struct wqtree {
@@ -341,98 +260,87 @@ wqtree_walloc(struct walloc_t* _allocator, wqtree_t** _dst)
         (*_dst)->alloc = _allocator;
         memset(&(*_dst)->root, 0, sizeof(struct wqnode));
         (*_dst)->root.uri = "/";
+        (*_dst)->root.value.t = 'N';
         err = 0;
     }
     return err;
 }
 
+static void
+wqnode_print(struct wqnode* node)
+{
+    printf("node: %s (%c)\n", node->uri, node->value.t);
+    if (node->child)
+        wqnode_print(node->child);
+    if (node->sibling)
+        wqnode_print(node->sibling);
+}
+
 void
 wqtree_print(struct wqtree* tree)
 {
-    wqnode_t* nd;
-    nd = &tree->root;
-    while (nd) {
-        printf("node: %s\n", nd->uri);
-        if (nd->sib)
-            nd = nd->sib;
-        else
-            nd = nd->chd;
+    wqnode_print(&tree->root);
+}
+
+wqnode_t*
+wqtree_get_node(wqtree_t* tree, const char* uri)
+{
+    wqnode_t* target;
+    int len;
+    len = strlen(uri);
+    target = &tree->root;
+    if (len > 1) {
+        // intermediate nodes are not necessarily created
+        // this allows to save some memory
+        // e.g.: if we follow the test example
+        // /foo/bar/float will be a child of root (/)
+        // that means that 'foo' and 'bar' nodes are omitted in that case
     }
-}
-
-static inline void
-_uricatnext(const char* uri, char* str)
-{
-    *str++ = '/';
-    uri++;
-    while (*uri != '/')
-        *str++ = *uri++;
-}
-
-static inline wqnode_t*
-wqnode_get_sibling(wqnode_t* target, const char* sib)
-{
-    while (target->sib && strcmp(target->sib->uri, sib))
-           target = target->sib;
     return target;
-}
-
-static inline wqnode_t*
-wqnode_get_child(wqnode_t* target, const char* chd)
-{
-    if (target->chd == NULL)
-        return target->chd;
-    if (strcmp(target->chd->uri, chd))
-        return wqnode_get_sibling(target->chd, chd);
-    else
-        return target->chd;
 }
 
 static wqnode_t*
 wqnode_get_parent(wqtree_t* tree, const char* uri)
 {
-    wqnode_t* target;
-    wqnode_t* child;
-    wstr_t* str;
-    int len, err;
-    target = &tree->root;
-    len = strlen(uri);
-    // we're looking for /foo/bar/int parent
-    // look for /foo first
-    // if /foo exists, set target to /foo and look for /foo/bar
-    // if /foo doesn't exist, set it to root
-    // we have to allocate a string here, of the same size as uri
-    if ((err = wstr_walloc(tree->alloc, &str, len)) < 0) {
-        wpnerr("could not allocate temporary string storage, "
-               "aborting...\n");
-        return NULL;
+    wqnode_t* parent = &tree->root;
+    if (parent->child && wuri_depth_greater(uri, 1)) {
+        int offset = 0;
+        parent = parent->child;
+        while (parent) {
+            int lim = strlen(parent->uri+offset);
+            if (strncmp(parent->uri+offset,
+                        uri+offset, lim)) {
+                // try with sibling
+                parent = parent->sibling;
+            } else {
+                if (parent->child && wuri_depth_greater(uri+offset+lim, 1)) {
+                    parent = parent->child;
+                    offset += lim;
+                } else {
+                    break;
+                }
+            }
+        }
     }
-    while ((child = wqnode_get_child(target, str->dat))) {
-           _uricatnext(uri, str->dat);
-           target = child;
-    }    
-    tree->alloc->free(str, sizeof(wstr_t)+str->cap, tree->alloc->data);
-    return target;
+    return parent;
 }
 
 static int
 wqtree_add_node(wqtree_t* tree, const char* uri,
                 enum wtype_t type, wqnode_t** dst)
 {
-    int err = 0;
-    wqnode_t* parent, *nd;
-    if (wosc_checkuri(uri))
+    int err;
+    wqnode_t* parent, *node;
+    if (wuri_check(uri))
         return WQUERY_URI_INVALID;
-    if ((err = wqnode_walloc(tree->alloc, &nd)) < 0) {
+    if ((err = wqnode_walloc(tree->alloc, &node)) < 0)
         return err;
-    }
-    if ((parent = wqnode_get_parent(tree, uri)) == NULL) {
-        return 43; // TODO: add proper error code: not enough memory space
-    }
-    nd->value.t = type;
-    wqnode_set_uri(nd, uri);
-    wqnode_add_child(parent, nd);
-    *dst = nd;
+    parent = wqnode_get_parent(tree, uri);
+    assert(parent);
+    node->value.t = type;
+    wqnode_set_uri(node, uri);
+    wqnode_add_child(parent, node);
+    *dst = node;
     return 0;
 }
 
@@ -440,6 +348,7 @@ wqtree_add_node(wqtree_t* tree, const char* uri,
     int wqtree_addnd##_Tag(wqtree_t* tree, const char* uri, wqnode_t** dst) \
     { return wqtree_add_node(tree, uri, _Type, dst); }
 
+WQTREE_DECL_ADDND(WOSC_TYPE_NIL, N);
 WQTREE_DECL_ADDND(WOSC_TYPE_INT, i);
 WQTREE_DECL_ADDND(WOSC_TYPE_FLOAT, f);
 WQTREE_DECL_ADDND(WOSC_TYPE_BOOL, b);
@@ -454,54 +363,11 @@ wqtree_addnds(wqtree_t* tree, const char* uri,
     if ((err = wqtree_add_node(tree, uri, 's', dst)))
         return err;    
     if ((err = wstr_walloc(tree->alloc, &str, strlim)) >= 0) {
+        err = 0;
         str->cap = strlim;
         (*dst)->value.u.s = str;
-        err = 0;
     }
     return err;
-}
-
-static wqnode_t*
-get_node_recursive(wqnode_t* target, const char* uri, int len, int thresh)
-{
-    int spn;
-    if ((spn = strspn(target->uri, uri)) == len) {
-        // target found
-        return target;
-    } else if (spn > thresh) {
-        // we have a partial identification (intermediate node)
-        // do the same with children
-        target = get_node_recursive(target->chd, uri, len, spn);
-    } else {
-        // no identification, try with siblings
-        while (target)
-               target = get_node_recursive(target->sib, uri, len, spn);
-    }
-    return target;
-}
-
-wqnode_t*
-wqtree_get_node(wqtree_t* tree, const char* uri)
-{
-    wqnode_t* target;
-    int len;
-    if (wosc_checkuri(uri)) {
-        wpnerr("uri: %s, incorrect format\n", uri);
-        return NULL;
-    }        
-    target = &tree->root;
-    len = strlen(uri);
-    if (len > 1) {
-        int len;
-        target = target->chd;
-        len = strlen(uri);
-        // intermediate nodes are not necessarily created
-        // e.g.: /foo/bar/float will be a child of root (/)
-        // if we follow the test example
-        // that means that 'foo' and 'bar' nodes are omitted in that case
-        target = get_node_recursive(target, uri, len, 1);
-    }
-    return target;
 }
 
 static int
@@ -746,12 +612,12 @@ wqserver_tcp_handle(struct mg_connection* mgc, int event, void* data)
             // query attribute
             // we don't expect it to be too large, maybe 128 bytes would be enough
             char buf[128];
-            wqnode_attr_printj(target, hm->query_string.p, buf, 128);
+//            wqnode_attr_printj(target, hm->query_string.p, buf, 128);
             wqserver_reply_json(mgc, buf);
         } else {
             // query all, including subnodes
             char buf[WPN114_MAXJSON];
-            wqnode_printj(target, buf, WPN114_MAXJSON);
+//            wqnode_printj(target, buf, WPN114_MAXJSON);
             wqserver_reply_json(mgc, buf);
         }
         break;

@@ -12,7 +12,7 @@ enum womsg_err {
 };
 
 int
-wosc_checkuri(const char* uri)
+wuri_check(const char* uri)
 {
     char c;
     if (*uri != '/')
@@ -21,6 +21,81 @@ wosc_checkuri(const char* uri)
     // pattern match the rest,
     // basically, check invalid characters
     return 0;
+}
+
+int
+wuri_depth(const char* uri)
+{
+    int depth = 0;
+    while (*uri)
+        if (*uri++ == '/')
+            depth++;
+    return depth;
+}
+
+bool
+wuri_depth_greater(const char* uri, int rhs)
+{
+    int depth = 0;
+    while (*uri)
+        if (*uri++ == '/' && ++depth > rhs)
+            return true;
+    return false;
+}
+
+const char*
+wuri_last(const char* uri)
+{
+    int len = strlen(uri);
+    const char* last = &uri[len-1];
+    while (*--last != '/')
+          ;
+    return last;
+}
+
+int
+wuri_parent(const char* uri, char* buf)
+{
+    const char* last = wuri_last(uri);
+    memcpy(buf, uri, last-uri);
+    // null terminate it
+    buf[last-uri] = 0;
+    return 0;
+}
+
+int
+wuri_at(const char* uri, int index, char* buf)
+{
+    int err;
+    if (index == 0) {
+        strcpy(buf, "/\0");
+        err = 0;
+    } else if (index >= wuri_depth(uri)) {
+        err = 1;
+    }
+    else {
+        index++;
+        while (1) {
+            if (*uri == '/')
+                index--;
+            if (index)
+                *buf++ = *uri++;
+            else
+                break;
+        }
+        *buf = 0;
+        err = 0;
+    }
+    return err;
+}
+
+const char*
+wuri_sub_at(const char* uri, int index, char* buf)
+{
+    wuri_at(uri, index, buf);
+    const char* sub = wuri_last(buf);
+    return ++sub;
+
 }
 
 const char*
@@ -125,7 +200,7 @@ womsg_seturi(struct womsg* msg, const char* uri)
 {
     // check uri
     int err, len;
-    if ((err = wosc_checkuri(uri)))
+    if ((err = wuri_check(uri)))
         return err;
     if (msg->mode > WOMSG_W)
         return WOMSG_READ_ONLY;

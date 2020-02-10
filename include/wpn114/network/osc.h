@@ -20,8 +20,32 @@ wosc_strerr(int err);
 /** Checks OSC method/uri for irregularities.
  * Returns zero if format is correct, >0 if incorrect */
 int
-wosc_checkuri(const char* uri)
+wuri_check(const char* uri)
 __nonnull((1));
+
+int
+wuri_depth(const char* uri)
+__nonnull((1));
+
+bool
+wuri_depth_greater(const char* uri, int rhs)
+__nonnull((1));
+
+const char*
+wuri_last(const char* uri)
+__nonnull((1));
+
+int
+wuri_parent(const char* uri, char* buf)
+__nonnull((1, 2));
+
+int
+wuri_at(const char* uri, int index, char* buf)
+__nonnull((1, 3));
+
+const char*
+wuri_sub_at(const char* uri, int index, char* buf)
+__nonnull((1, 3));
 
 #define womsg_alloca(_ptr)                                   \
     do { *_ptr = (womsg_t*) alloca(_womsg_sizeof());         \

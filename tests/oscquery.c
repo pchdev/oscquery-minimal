@@ -85,6 +85,7 @@ wtest(query_02)
     wtest_end;
 }
 
+// test simple server run
 wpn_declstatic_alloc_mp(wqmp_03, 256);
 wtest(query_03)
 {
@@ -104,6 +105,7 @@ wtest(query_03)
     wtest_end;
 }
 
+// test server-client connect
 wpn_declstatic_alloc_mp(wqmp_04, 1024);
 wtest(query_04)
 {
@@ -151,13 +153,39 @@ wtest(query_04)
     wtest_end;
 }
 
+// tree structure testing
+wpn_declstatic_alloc_mp(wqmp_05, 1024);
+wtest(query_05)
+{
+    wtest_begin(query_05);
+    wqtree_t* tree;
+    wqtree_walloc(&wqmp_05, &tree);
+    wqnode_t* foo, *foo_bar, *foo_bar_int, *foo_bar_int2, *foo_bar_int_int;
+    wqnode_t* bar, *bar_foo, *bar_foo_float, *bar_foo_float2, *bar_foo_float_float;
+
+    wtest_fassert_soft(wqtree_addndN(tree, "/foo", &foo));
+    wtest_fassert_soft(wqtree_addndN(tree, "/foo/bar", &foo_bar));
+    wtest_fassert_soft(wqtree_addndi(tree, "/foo/bar/int", &foo_bar_int));
+    wtest_fassert_soft(wqtree_addndi(tree, "/foo/bar/int2", &foo_bar_int2));
+    wtest_fassert_soft(wqtree_addndi(tree, "/foo/bar/int/int", &foo_bar_int_int));
+    wtest_fassert_soft(wqtree_addndN(tree, "/bar", &bar));
+    wtest_fassert_soft(wqtree_addndN(tree, "/bar/foo", &bar_foo));
+    wtest_fassert_soft(wqtree_addndf(tree, "/bar/foo/float", &bar_foo_float));
+    wtest_fassert_soft(wqtree_addndf(tree, "/bar/foo/float2", &bar_foo_float2));
+    wtest_fassert_soft(wqtree_addndf(tree, "/bar/foo/float/float", &bar_foo_float_float));
+
+    wqtree_print(tree);
+    wtest_end;
+}
+
 int
 main(void)
 {
     int err = 0;
-    err += wpn_unittest_query_01();
-    err += wpn_unittest_query_02();
-    err += wpn_unittest_query_03();
-    err += wpn_unittest_query_04();
+//    err += wpn_unittest_query_01();
+//    err += wpn_unittest_query_02();
+//    err += wpn_unittest_query_03();
+//    err += wpn_unittest_query_04();
+    err += wpn_unittest_query_05();
     return err;
 }

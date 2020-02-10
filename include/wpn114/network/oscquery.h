@@ -117,6 +117,7 @@ __nonnull((1));
 
 /** Adds node to tree, with <wtp> type and <uri>,
  * sets <dst> to point to the newly created node */
+extern int wqtree_addndN(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));
 extern int wqtree_addndi(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));
 extern int wqtree_addndf(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));
 extern int wqtree_addndb(wqtree_t* tree, const char* uri, wqnode_t** dst) __nonnull((1, 2, 3));
