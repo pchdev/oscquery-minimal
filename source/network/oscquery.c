@@ -286,9 +286,8 @@ wqnode_t*
 wqtree_get_node(wqtree_t* tree, const char* uri)
 {
     wqnode_t* target = &tree->root;
-    const char* utarget, *uuri;
-    int offset = 0;
-    int lim;
+    const char* utarget;
+    int offset = 0, lim;
     // if query is root, no need to enter the while loop
     if (strcmp(uri, "/") == 0)
         return target;
@@ -298,8 +297,8 @@ wqtree_get_node(wqtree_t* tree, const char* uri)
         // get both uri's maximum segment length
         // and compare the two of them with it
         utarget = target->uri+offset;
-        uuri = uri+offset;
-        if (wuri_segcmp(utarget, uuri, &lim)) {
+        uri += offset;
+        if (wuri_segcmp(utarget, uri, &lim)) {
             // if no match
             // try with sibling
             if (target->sibling)
@@ -308,7 +307,7 @@ wqtree_get_node(wqtree_t* tree, const char* uri)
                 // if no other sibling
                 // node can't be found, return NULL
                 return NULL;            
-        }  else if (lim == strlen(uri+offset)) {
+        }  else if (lim == strlen(uri)) {
             // segment matches
             // if this is the last uri segment, return target
             break;
@@ -330,11 +329,9 @@ wqnode_get_parent(wqtree_t* tree, const char* uri)
 {
     wqnode_t* parent = &tree->root;
     wqnode_t* target;
-    const char* utarget, *uuri;
-    int offset = 0;
-    int lim;
+    const char* utarget;
+    int offset = 0, lim;
     // if depth == 1 (e.g. /foo), parent will be root
-    // todo: wuri_depth_eq
     if (!parent->child || wuri_depth_eq(uri, 1))
         return parent;
     // else start with root's first child
@@ -343,8 +340,8 @@ wqnode_get_parent(wqtree_t* tree, const char* uri)
         // get both uri's maximum segment length
         // and compare the two of them with it
         utarget = target->uri+offset;
-        uuri = uri+offset;
-        if (wuri_segcmp(utarget, uuri, &lim)) {
+        uri += offset;
+        if (wuri_segcmp(utarget, uri, &lim)) {
             // if no match
             // try with sibling
             if (target->sibling)
@@ -354,7 +351,7 @@ wqnode_get_parent(wqtree_t* tree, const char* uri)
                 return parent;
         } else {
             // target ends with next segment,
-            if (wuri_depth_eq(uuri+lim, 1)) {
+            if (wuri_depth_eq(uri+lim, 1)) {
                 return target;
             }
             // else, try with children
