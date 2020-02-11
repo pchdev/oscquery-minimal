@@ -24,11 +24,23 @@ wuri_check(const char* uri)
 __nonnull((1));
 
 int
+wuri_seglen(const char* uri)
+__nonnull((1));
+
+int
+wuri_seglen_max(const char* u1, const char* u2)
+__nonnull((1, 2));
+
+int
+wuri_segcmp(const char* u1, const char* u2, int* len)
+__nonnull((1, 2));
+
+int
 wuri_depth(const char* uri)
 __nonnull((1));
 
 bool
-wuri_depth_greater(const char* uri, int rhs)
+wuri_depth_eq(const char* uri, unsigned int eq)
 __nonnull((1));
 
 const char*
@@ -39,13 +51,6 @@ int
 wuri_parent(const char* uri, char* buf)
 __nonnull((1, 2));
 
-int
-wuri_at(const char* uri, int index, char* buf)
-__nonnull((1, 3));
-
-const char*
-wuri_sub_at(const char* uri, int index, char* buf)
-__nonnull((1, 3));
 
 #define womsg_alloca(_ptr)                                   \
     do { *_ptr = (womsg_t*) alloca(_womsg_sizeof());         \

@@ -86,17 +86,25 @@ extern const char*
 wqnode_get_name(wqnode_t* nd)
 __nonnull((1));
 
-extern int wqnode_seti(wqnode_t* node, int i) __nonnull((1));;
-extern int wqnode_setf(wqnode_t* node, float f) __nonnull((1));;
-extern int wqnode_setc(wqnode_t* node, char c) __nonnull((1));;
-extern int wqnode_setb(wqnode_t* node, bool b) __nonnull((1));;
-extern int wqnode_sets(wqnode_t* node, const char* s)  __nonnull((1, 2));;
+extern int wqnode_seti(wqnode_t* node, int i) __nonnull((1));
+extern int wqnode_setf(wqnode_t* node, float f) __nonnull((1));
+extern int wqnode_setc(wqnode_t* node, char c) __nonnull((1));
+extern int wqnode_setb(wqnode_t* node, bool b) __nonnull((1));
+extern int wqnode_sets(wqnode_t* node, const char* s)  __nonnull((1, 2));
 
 extern int wqnode_geti(wqnode_t* node, int* i) __nonnull((1, 2));
-extern int wqnode_getf(wqnode_t* node, float* f) __nonnull((1, 2));;
-extern int wqnode_getc(wqnode_t* node, char* c) __nonnull((1, 2));;
-extern int wqnode_getb(wqnode_t* node, bool* b) __nonnull((1, 2));;
-extern int wqnode_gets(wqnode_t* node, const char** s) __nonnull((1, 2));;
+extern int wqnode_getf(wqnode_t* node, float* f) __nonnull((1, 2));
+extern int wqnode_getc(wqnode_t* node, char* c) __nonnull((1, 2));
+extern int wqnode_getb(wqnode_t* node, bool* b) __nonnull((1, 2));
+extern int wqnode_gets(wqnode_t* node, const char** s) __nonnull((1, 2));
+
+extern bool
+wqnode_is_child(wqnode_t* parent, wqnode_t* child)
+__nonnull((1, 2));
+
+extern bool
+wqnode_is_sibling(wqnode_t* nd1, wqnode_t* nd2)
+__nonnull((1, 2));
 
 typedef struct wqtree wqtree_t;
 

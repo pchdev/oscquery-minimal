@@ -24,9 +24,34 @@ wuri_check(const char* uri)
 }
 
 int
+wuri_seglen(const char* uri)
+{
+    const char* ucpy = uri;
+    if (*ucpy == '/')
+        ucpy++;
+    while (*ucpy != '/' && *ucpy != 0)
+        ucpy++;
+    return ucpy-uri;
+}
+
+int
+wuri_seglen_max(const char* u1, const char* u2)
+{
+    return wpnmax(wuri_seglen(u1), wuri_seglen(u2));
+}
+
+int
+wuri_segcmp(const char* u1, const char* u2, int* len)
+{
+    // optimizations are hard, but can maybe be done here...
+    *len = wpnmax(wuri_seglen(u1), wuri_seglen(u2));
+    return strncmp(u1, u2, *len);
+}
+
+int
 wuri_depth(const char* uri)
 {
-    int depth = 0;
+    unsigned int depth = 0;
     while (*uri)
         if (*uri++ == '/')
             depth++;
@@ -34,13 +59,14 @@ wuri_depth(const char* uri)
 }
 
 bool
-wuri_depth_greater(const char* uri, int rhs)
+wuri_depth_eq(const char* uri, unsigned int eq)
 {
-    int depth = 0;
+    unsigned int depth = 0;
     while (*uri)
-        if (*uri++ == '/' && ++depth > rhs)
-            return true;
-    return false;
+        if (*uri++ == '/')
+            if (++depth > eq)
+                return false;
+    return depth == eq;
 }
 
 const char*
@@ -61,41 +87,6 @@ wuri_parent(const char* uri, char* buf)
     // null terminate it
     buf[last-uri] = 0;
     return 0;
-}
-
-int
-wuri_at(const char* uri, int index, char* buf)
-{
-    int err;
-    if (index == 0) {
-        strcpy(buf, "/\0");
-        err = 0;
-    } else if (index >= wuri_depth(uri)) {
-        err = 1;
-    }
-    else {
-        index++;
-        while (1) {
-            if (*uri == '/')
-                index--;
-            if (index)
-                *buf++ = *uri++;
-            else
-                break;
-        }
-        *buf = 0;
-        err = 0;
-    }
-    return err;
-}
-
-const char*
-wuri_sub_at(const char* uri, int index, char* buf)
-{
-    wuri_at(uri, index, buf);
-    const char* sub = wuri_last(buf);
-    return ++sub;
-
 }
 
 const char*
