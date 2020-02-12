@@ -113,7 +113,7 @@ wtest(query_04)
     wqserver_t* server;
     wqclient_t* client;
     wqtree_t* tree;
-    wqnode_t *ndi, *ndf, *ndb, *ndc, *nds;
+    wqnode_t *ndi, *ndf, *ndb, *ndc, *nds, *root;
 
     wtest_fassert_soft(wqtree_walloc(&wqmp_04, &tree));
     wtest_fassert_soft(wqtree_addndi(tree, "/foo/bar/int", &ndi));
@@ -121,6 +121,11 @@ wtest(query_04)
     wtest_fassert_soft(wqtree_addndb(tree, "/foo/bar/bool", &ndb));
     wtest_fassert_soft(wqtree_addndc(tree, "/foo/bar/char", &ndc));
     wtest_fassert_soft(wqtree_addnds(tree, "/foo/bar/string", &nds, 32));
+    root = wqtree_get_node(tree, "/");
+    wtest_assert_soft(root != NULL);
+    wtest_assert_soft(wqnode_is_child(root, ndi));
+    wtest_assert_soft(wqnode_is_sibling(ndi, ndf));
+
     wqtree_print(tree);
     wmemp_rmnprint(&wqmp_04_mp);
     wqnode_set_fn(ndi, ndi_fn, tree);
@@ -176,16 +181,29 @@ wtest(query_05)
     wtest_fassert_soft(wqtree_addndf(tree, "/bar/foo/float/float", &bar_foo_float_float));
     wtest_fassert_soft(wqtree_addndf(tree, "/bar/foo/float2/float", &bar_foo_float2_float));
 
+    wtest_assert_soft(wqnode_is_child(foo, foo_bar));
+    wtest_assert_soft(wqnode_is_child(foo_bar, foo_bar_int));
+    wtest_assert_soft(wqnode_is_sibling(foo_bar_int, foo_bar_int2));
+    wtest_assert_soft(wqnode_is_child(foo_bar_int, foo_bar_int_int));
+
+    wtest_assert_soft(wqnode_is_sibling(bar, foo));
+    wtest_assert_soft(wqnode_is_child(bar, bar_foo));
+    wtest_assert_soft(wqnode_is_child(bar_foo, bar_foo_float));
+    wtest_assert_soft(wqnode_is_sibling(bar_foo_float, bar_foo_float2));
+    wtest_assert_soft(wqnode_is_child(bar_foo_float_float, bar_foo_float));
+    wtest_assert_soft(wqnode_is_child(bar_foo_float2_float, bar_foo_float2));
+
     wtest_assert_soft((bool)wqtree_get_node(tree, "/"));
-    wtest_assert_soft((bool)wqtree_get_node(tree, "/foo/bar"));
-    wtest_assert_soft((bool)wqtree_get_node(tree, "/foo/bar/int"));
-    wtest_assert_soft((bool)wqtree_get_node(tree, "/foo/bar/int2"));
-    wtest_assert_soft((bool)wqtree_get_node(tree, "/foo/bar/int/int"));
-    wtest_assert_soft((bool)wqtree_get_node(tree, "/bar"));
-    wtest_assert_soft((bool)wqtree_get_node(tree, "/bar/foo"));
-    wtest_assert_soft((bool)wqtree_get_node(tree, "/bar/foo/float"));
-    wtest_assert_soft((bool)wqtree_get_node(tree, "/bar/foo/float2"));
-    wtest_assert_soft((bool)wqtree_get_node(tree, "/bar/foo/float/float"));
+    wtest_assert_soft(wqtree_get_node(tree, "/foo/bar") == foo_bar);
+    wtest_assert_soft(wqtree_get_node(tree, "/foo/bar/int") == foo_bar_int);
+    wtest_assert_soft(wqtree_get_node(tree, "/foo/bar/int2") == foo_bar_int2);
+    wtest_assert_soft(wqtree_get_node(tree, "/foo/bar/int/int") == foo_bar_int_int);
+    wtest_assert_soft(wqtree_get_node(tree, "/bar") == bar);
+    wtest_assert_soft(wqtree_get_node(tree, "/bar/foo") == bar_foo);
+    wtest_assert_soft(wqtree_get_node(tree, "/bar/foo/float") == bar_foo_float);
+    wtest_assert_soft(wqtree_get_node(tree, "/bar/foo/float2") == bar_foo_float2);
+    wtest_assert_soft(wqtree_get_node(tree, "/bar/foo/float/float") == bar_foo_float_float);
+    wtest_assert_soft(wqtree_get_node(tree, "/bar/foo/float2/float") == bar_foo_float2_float);
 
     wqtree_print(tree);
     wtest_end;

@@ -106,9 +106,10 @@ extern bool
 wqnode_is_sibling(wqnode_t* nd1, wqnode_t* nd2)
 __nonnull((1, 2));
 
+/** A handle on a OSC-node data structure */
 typedef struct wqtree wqtree_t;
 
-/** Allocates <dst> tree from <allocator> */
+/** Allocates <dst> tree pointer from <allocator> */
 extern int
 wqtree_walloc(struct walloc_t* allocator, wqtree_t** dst)
 __nonnull((1));
@@ -144,7 +145,7 @@ __nonnull((1, 2));
 /** A handle on an oscquery server data structure */
 typedef struct wqserver wqserver_t;
 
-/** Allocates <dst> oscquery server from <allocator> */
+/** Allocates <dst> oscquery server pointer from <allocator> */
 extern int
 wqserver_walloc(struct walloc_t* allocator, wqserver_t** dst)
 __nonnull((1, 2));
@@ -167,8 +168,10 @@ extern int
 wqserver_stop(wqserver_t* server)
 __nonnull((1));
 
+/** A handle on an oscquery client data structure */
 typedef struct wqclient wqclient_t;
 
+/** Allocates <dst> oscquery client poiter from <allocator> */
 extern int
 wqclient_walloc(struct walloc_t* alloc, wqclient_t** dst)
 __nonnull((1, 2));

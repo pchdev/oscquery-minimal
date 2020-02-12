@@ -750,6 +750,7 @@ struct wqclient {
     struct wqtree tree;
     pthread_t thread;    
     bool running;
+    uint16_t port;
 };
 
 int
@@ -787,7 +788,6 @@ wqclient_tcp_handle(struct mg_connection* mgc, int event, void* data)
         mg_sock_addr_to_str(&cli->cn.tcp->sa, addr, sizeof(addr), MG_SOCK_STRINGIFY_IP);
         mg_sock_addr_to_str(&cli->cn.tcp->sa, port, sizeof(port), MG_SOCK_STRINGIFY_PORT);
         sprintf(url, "ws://%s:%s/", addr, port);
-
         mg_connect_http(&cli->mgr, wqclient_tcp_handle, url, NULL, NULL);
         strcat(url, "?HOST_INFO");
         mg_connect_http(&cli->mgr, wqclient_tcp_handle, url, NULL, NULL);
@@ -795,12 +795,10 @@ wqclient_tcp_handle(struct mg_connection* mgc, int event, void* data)
     }
     case MG_EV_WEBSOCKET_FRAME: {
         struct websocket_message* wm = data;
-        if (wm->flags & WEBSOCKET_OP_TEXT) {
-            // we shouldn't receive anything here
-            wpnerr("dave, this is highly irregular..");
-        } else if (wm->flags & WEBSOCKET_OP_BINARY) {
+        if (wm->flags & WEBSOCKET_OP_BINARY)
             wqtree_update_osc(&cli->tree, wm->data, wm->size);
-        }
+        else
+            wpnerr("client unsupported websocket message type\n");
         break;
     }
     case MG_EV_HTTP_REPLY: {
