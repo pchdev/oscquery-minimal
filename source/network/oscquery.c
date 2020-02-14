@@ -3,17 +3,6 @@
 #include <dependencies/mjson/mjson.h>
 #include <assert.h>
 
-#define WQNODE_IGNORE 0
-#define WQNODE_LISTEN 1
-
-#ifndef WPN114_MAXPATH
-    #define WPN114_MAXPATH  256
-#endif
-
-#ifndef WPN114_MAXJSON
-    #define WPN114_MAXJSON  1024
-#endif
-
 const char*
 wquery_strerr(int err)
 {
@@ -50,6 +39,9 @@ wstr_walloc(struct walloc_t* _allocator, wstr_t** dst, uint16_t strlim)
 // ------------------------------------------------------------------------------------------------
 // NODE/TREE
 // ------------------------------------------------------------------------------------------------
+
+#define WQNODE_IGNORE 0
+#define WQNODE_LISTEN 1
 
 // we want to limit this to 64 bytes
 struct wqnode {
@@ -101,7 +93,7 @@ wqnode_add_sibling(wqnode_t* node, wqnode_t* sibling)
     while (node->sibling)
         node = node->sibling;
     node->sibling = sibling;
-    wpnout("adding %s as a sibling to %s\n", sibling->uri, node->uri);
+//    wpnout(KRED "adding %s as a sibling to %s\n" KNRM, sibling->uri, node->uri);
     return 0;
 }
 
@@ -110,12 +102,45 @@ wqnode_add_child(wqnode_t* parent, wqnode_t* child)
 {
     if (parent->child == NULL) {
         parent->child = child;
-        wpnout("adding node %s to parent %s\n",
-               child->uri, parent->uri);
+//        wpnout(KRED "adding node %s to parent %s\n" KNRM,
+//               child->uri, parent->uri);
     } else {
         wqnode_add_sibling(parent->child, child);
     }
     return 0;
+}
+
+bool
+wqnode_is_child(wqnode_t* parent, wqnode_t* child)
+{
+    wqnode_t* target = parent->child;
+    while (target) {
+        if (target == child)
+            return true;
+        target = child->sibling;
+    }
+    return false;
+}
+
+static inline bool
+wqnode_is_sibling_2(wqnode_t* nd1, wqnode_t* nd2)
+{
+    while (nd1) {
+        if (nd1->sibling == nd2)
+            return true;
+        nd1 = nd1->sibling;
+    }
+    return false;
+}
+
+bool
+wqnode_is_sibling(wqnode_t* nd1, wqnode_t* nd2)
+{
+    bool ans;
+    if ((ans = wqnode_is_sibling_2(nd1, nd2)))
+        return ans;
+    else
+        return wqnode_is_sibling_2(nd2, nd1);
 }
 
 static __always_inline int
@@ -266,7 +291,7 @@ wqtree_walloc(struct walloc_t* _allocator, wqtree_t** _dst)
     return err;
 }
 
-static void
+void
 wqnode_print(struct wqnode* node)
 {
     printf("node: %s (%c)\n", node->uri, node->value.t);
@@ -286,7 +311,7 @@ wqnode_t*
 wqtree_get_node(wqtree_t* tree, const char* uri)
 {
     wqnode_t* target = &tree->root;
-    const char* utarget;
+    const char* utarget, *uuri;
     int offset = 0, lim;
     // if query is root, no need to enter the while loop
     if (strcmp(uri, "/") == 0)
@@ -297,12 +322,12 @@ wqtree_get_node(wqtree_t* tree, const char* uri)
         // get both uri's maximum segment length
         // and compare the two of them with it
         utarget = target->uri+offset;
-        uri += offset;
-        if (wuri_segcmp(utarget, uri, &lim)) {
+        uuri = uri+offset;
+        if (wuri_segcmp(utarget, uuri, &lim)) {
             // if no match
             // try with sibling
             target = target->sibling;
-        }  else if (lim == strlen(uri)) {
+        }  else if (lim == strlen(uuri)) {
             // segment matches
             // if this is the last uri segment, return target
             break;
@@ -324,7 +349,7 @@ wqnode_get_parent(wqtree_t* tree, const char* uri)
 {
     wqnode_t* parent = &tree->root;
     wqnode_t* target;
-    const char* utarget;
+    const char* utarget, *uuri;
     int offset = 0, lim;
     // if depth == 1 (e.g. /foo), parent will be root
     if (!parent->child || wuri_depth_eq(uri, 1))
@@ -335,8 +360,8 @@ wqnode_get_parent(wqtree_t* tree, const char* uri)
         // get both uri's maximum segment length
         // and compare the two of them with it
         utarget = target->uri+offset;
-        uri += offset;
-        if (wuri_segcmp(utarget, uri, &lim)) {
+        uuri = uri+offset;
+        if (wuri_segcmp(utarget, uuri, &lim)) {
             // if no match
             // try with sibling
             if (target->sibling)
@@ -344,9 +369,9 @@ wqnode_get_parent(wqtree_t* tree, const char* uri)
             else
                 // if no siblings, return parent
                 return parent;
-        } else {
+        } else {           
             // target ends with next segment,
-            if (wuri_depth_eq(uri+lim, 1)) {
+            if (wuri_depth_eq(uuri+lim, 1)) {
                 return target;
             }
             // else, try with children
@@ -354,8 +379,9 @@ wqnode_get_parent(wqtree_t* tree, const char* uri)
                 parent = target;
                 target = target->child;
                 offset += lim;
-            } else
-                return parent;
+            } else {
+                return target;
+            }
         }
     }
     return target;
@@ -461,10 +487,6 @@ wqtree_update_osc(wqtree_t* tree, byte_t* data, int len)
 #define HTTP_MIME           "Content-Type: "
 #define HTTP_MIME_JSON      HTTP_MIME "application/json"
 
-#ifndef WPN114_MAXCN
-    #define WPN114_MAXCN    1
-#endif
-
 struct wqconnection {
     struct mg_connection* tcp;
     int udp;
@@ -472,8 +494,9 @@ struct wqconnection {
 
 struct wqserver {
     struct mg_mgr mgr;
-    struct wqconnection cn[WPN114_MAXCN];
+    struct wqconnection cn[WQUERY_MAX_CONNECTIONS];
     struct wqtree* tree;
+    struct walloc_t* allocator;
 #ifdef WPN114_MULTITHREAD
     pthread_t thread;
 #endif
@@ -494,6 +517,13 @@ wqserver_walloc(struct walloc_t* _allocator, wqserver_t** dst)
     return err;
 }
 
+void
+wqserver_set_allocator(struct wqserver* server,
+                       struct walloc_t* allocator)
+{
+    server->allocator = allocator;
+}
+
 int
 wqserver_expose(wqserver_t* server, wqtree_t* tree)
 {
@@ -504,33 +534,11 @@ wqserver_expose(wqserver_t* server, wqtree_t* tree)
 static struct wqconnection*
 wqserver_get_connection(wqserver_t* server, struct mg_connection* mgc)
 {
-    for (int n = 0; n < WPN114_MAXCN; ++n)
+    for (int n = 0; n < WQUERY_MAX_CONNECTIONS; ++n)
          if (server->cn[n].tcp == mgc)
              return &server->cn[n];
     return NULL;
 }
-
-// better to omit fields that are 'false'?
-static const char*
-s_host_ext =
-    "{ "
-        "\"ACCESS\": true,"
-        "\"VALUE\": true,"
-        "\"CRITICAL\": true,"
-        "\"LISTEN\": true,"
-        "\"OSC_STREAMING\": true"
-//        "\"DESCRIPTION\": false,"
-//        "\"TAGS\": false,"
-//        "\"EXTENDED_TYPE\": false,"
-//        "\"UNIT\": false,"
-//        "\"CLIPMODE\": false,"
-//        "\"PATH_CHANGED\": false,"
-//        "\"PATH_REMOVED\": false,"
-//        "\"PATH_ADDED\": false,"
-//        "\"PATH_RENAMED\": false,"
-//        "\"HTML\": false,"
-//        "\"ECHO\": false, "
-    "}";
 
 static inline int
 wqserver_reply_json(struct mg_connection* mgc,
@@ -545,7 +553,7 @@ static int
 wqserver_add_connection(struct wqserver* server,
                         struct mg_connection* mgc)
 {
-    for (int nc = 0; nc < WPN114_MAXCN; ++nc) {
+    for (int nc = 0; nc < WQUERY_MAX_CONNECTIONS; ++nc) {
         if (server->cn[nc].tcp == NULL) {
             server->cn[nc].tcp = mgc;
             return 0;
@@ -555,8 +563,7 @@ wqserver_add_connection(struct wqserver* server,
 }
 
 static void
-wqserver_cmd_listen(wqserver_t* server,
-                    char* data, int size,
+wqserver_cmd_listen(wqserver_t* server, char* data, int size,
                     bool status)
 {
     wqnode_t* target;
@@ -600,12 +607,29 @@ wqserver_handle_ws_text(wqserver_t* server,
     }
 }
 
-static void
-wqserver_reply_host_info(wqserver_t* server,
-                         struct mg_connection* mgc)
-{
+// better to omit fields that are 'false'?
+static const char*
+s_host_ext =
+    "{ "
+        "\"ACCESS\": true,"
+        "\"VALUE\": true,"
+        "\"CRITICAL\": true,"
+        "\"LISTEN\": true,"
+        "\"OSC_STREAMING\": true"
+//        "\"DESCRIPTION\": false,"
+//        "\"TAGS\": false,"
+//        "\"EXTENDED_TYPE\": false,"
+//        "\"UNIT\": false,"
+//        "\"CLIPMODE\": false,"
+//        "\"PATH_CHANGED\": false,"
+//        "\"PATH_REMOVED\": false,"
+//        "\"PATH_ADDED\": false,"
+//        "\"PATH_RENAMED\": false,"
+//        "\"HTML\": false,"
+//        "\"ECHO\": false, "
+    "}";
 
-}
+#define WJSTR(_str) "\"" _str "\""
 
 static void
 wqserver_handle_request(wqserver_t* server,
@@ -615,30 +639,37 @@ wqserver_handle_request(wqserver_t* server,
     wqnode_t* target;
     target = wqtree_get_node(server->tree, hm->uri.p);
     if (hm->query_string.len) {
-        if (strcmp(hm->query_string.p, "HOST_INFO") == 0) {
-            // use tree allocator?
-            // note: we can approximately get the size beforehand
-            char buf[WPN114_MAXJSON];
+        if (strspn(hm->query_string.p, "HOST_INFO") == 9) {
+            // use server allocator?
             int err;
-            err = mjson_printf(&mjson_print_fixed_buf, buf,
-                               "{%Q:%s, %Q:%d, %Q:%s, %Q:%s}",
-                  "NAME", "wqserver",
-                  "OSC_PORT", server->uport,
-                  "OSC_TRANSPORT", "UDP",
-                  "EXTENSIONS", s_host_ext);
+            char* buf;
+            if ((err = server->allocator->alloc(&buf, 256,
+                server->allocator->data))) {
+                wpnerr("could not allocate temporary string storage "
+                       "required for http replying, aborting..\n");
+                assert(0);
+            }
+            err = snprintf(buf, 256, "{%s:%s, %s:%d, %s:%s, %s:%s}",
+                     WJSTR("NAME"), WJSTR("wqserver"),
+                     WJSTR("OSC_PORT"), server->uport,
+                     WJSTR("OSC_TRANSPORT"), WJSTR("UDP"),
+                     WJSTR("EXTENSIONS"), s_host_ext);
+            wpnout("replying with host_info: %s\n", buf);
+            server->allocator->free(&buf, 256,
+            server->allocator->data);
             wqserver_reply_json(mgc, buf);
         } else {
-            // query attribute
-            // we don't expect it to be too large, maybe 128 bytes would be enough
-            char buf[128];
+            // query attribute, we need to allocate, in case value is a looong string for example            
+            int err;
+            char* buf;
     //            wqnode_attr_printj(target, hm->query_string.p, buf, 128);
             wqserver_reply_json(mgc, buf);
         }
     } else {
         // query all, including subnodes
-        char buf[WPN114_MAXJSON];
+//        char buf[WPN114_MAXJSON];
 //            wqnode_printj(target, buf, WPN114_MAXJSON);
-        wqserver_reply_json(mgc, buf);
+//        wqserver_reply_json(mgc, buf);
     }
 }
 
@@ -748,7 +779,10 @@ struct wqclient {
     struct mg_mgr mgr;
     struct wqconnection cn;
     struct wqtree tree;
+    struct walloc_t* allocator;
+#ifdef WQUERY_MULTITHREAD
     pthread_t thread;    
+#endif
     bool running;
     uint16_t port;
 };
@@ -764,6 +798,13 @@ wqclient_walloc(struct walloc_t* _allocator, wqclient_t** dst)
         err = 0;
     }
     return err;
+}
+
+void
+wqclient_set_allocator(struct wqclient* client,
+                       struct walloc_t* allocator)
+{
+    client->allocator = allocator;
 }
 
 
@@ -803,13 +844,13 @@ wqclient_tcp_handle(struct mg_connection* mgc, int event, void* data)
     }
     case MG_EV_HTTP_REPLY: {
         struct http_message* hm = data;
-        if (strcmp(hm->query_string.p, "HOST_INFO") == 0) {
+        if (strspn(hm->query_string.p, "HOST_INFO") == 9) {
             char cmd[128];
             double uport;
             int err;
             mjson_get_number(hm->body.p, hm->body.len, "$.OSC_PORT", &uport);
             cli->cn.udp = uport;
-            // send back confirmation message, with our own udp port
+            // send back confirmation message, with our own udp port            
             err = mjson_printf(&mjson_print_fixed_buf, cmd,
                                "{%Q:%s, %Q:{%Q:%d, %Q:%d}}",
                                "COMMAND", "START_OSC_STREAMING",
@@ -854,7 +895,7 @@ wqclient_connect(wqclient_t* client, const char* addr, uint16_t port)
 
     client->cn.tcp = mgct;
     client->running = true;
-#ifdef WPN114_MULTITHREAD
+#ifdef WQUERY_MULTITHREAD
     pthread_create(&client->thread, 0, wqclient_pthread_run, client);
 #endif
     return 0;
@@ -870,7 +911,7 @@ int
 wqclient_disconnect(wqclient_t* client)
 {
     client->running = false;
-#ifdef WPN114_MULTITHREAD
+#ifdef WQUERY_MULTITHREAD
     pthread_join(client->thread, 0);
 #endif
     return 0;

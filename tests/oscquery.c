@@ -190,8 +190,8 @@ wtest(query_05)
     wtest_assert_soft(wqnode_is_child(bar, bar_foo));
     wtest_assert_soft(wqnode_is_child(bar_foo, bar_foo_float));
     wtest_assert_soft(wqnode_is_sibling(bar_foo_float, bar_foo_float2));
-    wtest_assert_soft(wqnode_is_child(bar_foo_float_float, bar_foo_float));
-    wtest_assert_soft(wqnode_is_child(bar_foo_float2_float, bar_foo_float2));
+    wtest_assert_soft(wqnode_is_child(bar_foo_float, bar_foo_float_float));
+    wtest_assert_soft(wqnode_is_child(bar_foo_float2, bar_foo_float2_float));
 
     wtest_assert_soft((bool)wqtree_get_node(tree, "/"));
     wtest_assert_soft(wqtree_get_node(tree, "/foo/bar") == foo_bar);
@@ -213,10 +213,10 @@ int
 main(void)
 {
     int err = 0;
-    err += wpn_unittest_query_01();
-    err += wpn_unittest_query_02();
-    err += wpn_unittest_query_03();
-    err += wpn_unittest_query_04();
+//    err += wpn_unittest_query_01();
+//    err += wpn_unittest_query_02();
+//    err += wpn_unittest_query_03();
+//    err += wpn_unittest_query_04();
     err += wpn_unittest_query_05();
     return err;
 }

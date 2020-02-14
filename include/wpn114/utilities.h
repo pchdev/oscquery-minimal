@@ -6,6 +6,15 @@
 #include <string.h>
 #include <wpn114/wpn114.h>
 
+#define WCOLOR_REGULAR  "\x1B[0m"
+#define WCOLOR_RED      "\x1B[31m"
+#define WCOLOR_GREEN    "\x1B[32m"
+#define WCOLOR_YELLOW   "\x1B[33m"
+#define WCOLOR_BLUE     "\x1B[34m"
+#define WCOLOR_MAGENTA  "\x1B[35m"
+#define WCOLOR_CYAN     "\x1B[36m"
+#define WCOLOR_WHITE    "\x1B[37m"
+
 #define wpnmin(_a, _b) (_a < _b ? _a : _b)
 #define wpnmax(_a, _b) (_a > _b ? _a : _b)
 

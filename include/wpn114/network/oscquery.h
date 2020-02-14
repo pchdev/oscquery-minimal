@@ -86,6 +86,10 @@ extern const char*
 wqnode_get_name(wqnode_t* nd)
 __nonnull((1));
 
+extern void
+wqnode_print(struct wqnode* node)
+__nonnull((1));
+
 extern int wqnode_seti(wqnode_t* node, int i) __nonnull((1));
 extern int wqnode_setf(wqnode_t* node, float f) __nonnull((1));
 extern int wqnode_setc(wqnode_t* node, char c) __nonnull((1));
@@ -150,6 +154,12 @@ extern int
 wqserver_walloc(struct walloc_t* allocator, wqserver_t** dst)
 __nonnull((1, 2));
 
+/** Sets server's allocator, mainly used for json string allocation.
+ *  NULL=malloc */
+extern void
+wqserver_set_allocator(wqserver_t* server, struct walloc_t* allocator)
+__nonnull((1));
+
 /** Expose <tree> of wqnodes on the network */
 extern int
 wqserver_expose(wqserver_t* server, wqtree_t* tree)
@@ -175,6 +185,12 @@ typedef struct wqclient wqclient_t;
 extern int
 wqclient_walloc(struct walloc_t* alloc, wqclient_t** dst)
 __nonnull((1, 2));
+
+/** Sets server's allocator, mainly used for json string allocation.
+ *  NULL=malloc */
+extern void
+wqclient_set_allocator(wqclient_t* client, struct walloc_t* allocator)
+__nonnull((1));
 
 extern int
 wqclient_connect(wqclient_t* client, const char* addr, uint16_t port)
