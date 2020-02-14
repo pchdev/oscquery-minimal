@@ -93,7 +93,8 @@ wqnode_add_sibling(wqnode_t* node, wqnode_t* sibling)
     while (node->sibling)
         node = node->sibling;
     node->sibling = sibling;
-//    wpnout(KRED "adding %s as a sibling to %s\n" KNRM, sibling->uri, node->uri);
+//    wpnout(WCOLOR_RED "adding %s as a sibling to %s\n"
+//           WCOLOR_REGULAR, sibling->uri, node->uri);
     return 0;
 }
 
@@ -102,8 +103,8 @@ wqnode_add_child(wqnode_t* parent, wqnode_t* child)
 {
     if (parent->child == NULL) {
         parent->child = child;
-//        wpnout(KRED "adding node %s to parent %s\n" KNRM,
-//               child->uri, parent->uri);
+//        wpnout(WCOLOR_RED "adding node %s to parent %s\n"
+//               WCOLOR_REGULAR, child->uri, parent->uri);
     } else {
         wqnode_add_sibling(parent->child, child);
     }
@@ -380,7 +381,7 @@ wqnode_get_parent(wqtree_t* tree, const char* uri)
                 target = target->child;
                 offset += lim;
             } else {
-                return target;
+                return parent;
             }
         }
     }

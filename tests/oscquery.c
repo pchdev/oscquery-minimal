@@ -213,10 +213,10 @@ int
 main(void)
 {
     int err = 0;
-//    err += wpn_unittest_query_01();
-//    err += wpn_unittest_query_02();
-//    err += wpn_unittest_query_03();
-//    err += wpn_unittest_query_04();
+    err += wpn_unittest_query_01();
+    err += wpn_unittest_query_02();
+    err += wpn_unittest_query_03();
+    err += wpn_unittest_query_04();
     err += wpn_unittest_query_05();
     return err;
 }
