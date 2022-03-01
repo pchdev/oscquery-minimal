@@ -12,10 +12,7 @@ test_01 :: proc()
     msg: osc.Message;
 
     assert(osc.encode(&msg, buf[:], "/foo/bar") == Error.None);
-    assert(
-      osc.write_lock(&msg, 31.6, 47, true,  'Y', "owls are not what they seem")
-      == Error.None
-    );
+    assert(osc.write_lock(&msg, 31.6, 47, true,  'Y', "owls are not what they seem") == Error.None);
     assert(osc.remaining(&msg) == 5);
     osc.print_raw(&msg);
     fmt.println("remaining data:", osc.remaining(&msg), "bytes");
@@ -26,8 +23,9 @@ test_01 :: proc()
     assert(osc.tag(&msg) == "fiTcs");
     assert(osc.argc(&msg) == 5);
 
-    for c in osc.tag(&msg) do
+    for c in osc.tag(&msg) {
         fmt.println(rune(c));
+    }
 
     fmt.println(osc.read_f32(&msg)); // 31.6
     fmt.println(osc.read_i32(&msg)); // 47

@@ -10,7 +10,7 @@ Flags :: enum {
   Tag_Locked,
     Tag_Free,
        Write,
-        Read
+        Read,
 }
 
 Error :: enum i32 {
@@ -48,8 +48,9 @@ encode :: proc(msg: ^Message, buf: []byte, uri: string) -> Error {
 
 @(require_results)
 set_uri :: proc(msg: ^Message, uri: string) -> Error {
-    if check_uri(uri) do
-       return Error.Uri_Invalid;
+    if check_uri(uri) {
+        return Error.Uri_Invalid;
+    }
     size := len(uri);
     size += npads(size);
     copy(msg.buf[:], uri);
@@ -58,7 +59,7 @@ set_uri :: proc(msg: ^Message, uri: string) -> Error {
 }
 
 @(private)
-write_data :: inline proc(using msg: ^Message, v: $T) {
+write_data :: proc(using msg: ^Message, v: $T) {
     sz := size_of(T);
     cp := v;
     wptr, ok := slice.get_ptr(buf, data+rw_d);
@@ -68,7 +69,7 @@ write_data :: inline proc(using msg: ^Message, v: $T) {
 }
 
 @(private)
-write_ttag :: inline proc(using msg: ^Message, tag: byte) {
+write_ttag :: #force_inline proc(using msg: ^Message, tag: byte) {
     buf[ttag+rw_t] = tag;
     rw_t += 1;
 }
@@ -78,18 +79,20 @@ write :: proc {
     write_i32,
     write_f32,
     write_rune,
-    write_string
+    write_string,
     // todo: cstring, boolean, midi, timetag, etc.
 };
 
 @(private, require_results)
 write_check :: proc(using msg: ^Message, size: int, tag: byte) -> Error {
-    if mode > Flags.Write do
+    if mode > Flags.Write {
        return Error.Read_Only;
+    }
     // check remaining space
     rmn := remaining(msg);
-    if size + npads(size) > rmn do
+    if size + npads(size) > rmn {
        return Error.Buffer_Overflow;
+    }
     // other error checks TODO
     return Error.None;
 }
@@ -150,23 +153,19 @@ write_lock :: proc(using msg: ^Message, args: ..any) -> Error
         switch v in value {
         case int: {
         if err := write_i32(msg, i32(v));
-           err != .None do
-           return err;
+           err != .None do return err;
         }
         case f64: {
         if err := write_f32(msg, f32(v));
-           err != .None do
-           return err;
+           err != .None do return err;
         }
         case rune: {
         if err := write_rune(msg, v);
-           err != .None do
-           return err;
+           err != .None do return err;
         }
         case string: {
         if err := write_string(msg, v);
-           err != .None do
-           return err;
+           err != .None do return err;
         }
         case bool: {
             if v do write_ttag(msg, 'T');
@@ -197,27 +196,27 @@ decode :: proc(using dst: ^Message, buffer: []byte) -> Error {
 }
 
 // returns message's typetag line as string
-tag :: inline proc(using msg: ^Message) -> string {
+tag :: #force_inline proc(using msg: ^Message) -> string {
     return byte2str(buf[ttag+1:]);
 }
 
 // returns message's uri as string
-uri :: inline proc(using msg: ^Message) -> string {
+uri :: #force_inline proc(using msg: ^Message) -> string {
     return byte2str(buf);
 }
 
 // returns the number of bytes used in message's buffer
-nbytes :: inline proc(using msg: ^Message) -> int {
+nbytes :: #force_inline proc(using msg: ^Message) -> int {
     return data+rw_d;
 }
 
 // returns space left in bytes
-remaining :: inline proc(using msg: ^Message) -> int {
+remaining :: #force_inline proc(using msg: ^Message) -> int {
     return len(buf)-nbytes(msg);
 }
 
 // returns argument count
-argc :: inline proc(using msg: ^Message) -> int {
+argc :: #force_inline proc(using msg: ^Message) -> int {
     return bytestr_len(buf[ttag:])-1;
 }
 
@@ -275,7 +274,7 @@ read_cstring :: proc(using msg: ^Message) -> Result(cstring) {
 read_string :: proc(using msg: ^Message) -> Result(string) {
     switch v in read_cstring(msg) {
           case Error: return v;
-        case cstring: return string(v);
+          case cstring: return string(v);
     }
     return Error.None;
 }
@@ -289,29 +288,29 @@ print_raw :: proc(using msg: ^Message) {
 // ----------------------------------------------------------------------------
 
 @(private)
-bytestr_len :: inline proc(s: []byte) -> int {
+bytestr_len :: #force_inline proc(s: []byte) -> int {
     ptr := slice.as_ptr(s);
     return len(cstring(ptr));
 }
 
 @(private)
-byte2str :: inline proc(s: []byte) -> string {
+byte2str :: #force_inline proc(s: []byte) -> string {
     return string(cstring(slice.as_ptr(s)));
 }
 
 @(private)
-next_tag :: inline proc(using msg: ^Message) -> byte {
+next_tag :: #force_inline proc(using msg: ^Message) -> byte {
      defer rw_t += 1;
     return buf[ttag + rw_t];
 }
 
 @(private)
-npads :: inline proc(sz: int) -> int {
+npads :: #force_inline proc(sz: int) -> int {
     return 4-(sz%4);
 }
 
 @(private, require_results)
-check_uri :: inline proc(uri: string) -> bool {
+check_uri :: #force_inline proc(uri: string) -> bool {
     // TODO
     return false;
 }
